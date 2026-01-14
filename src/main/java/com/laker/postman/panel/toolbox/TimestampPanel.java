@@ -28,8 +28,8 @@ public class TimestampPanel extends JPanel {
 
     public TimestampPanel() {
         initUI();
-        startAutoRefresh();
     }
+
 
     private void initUI() {
         setLayout(new BorderLayout(10, 10));
@@ -225,6 +225,25 @@ public class TimestampPanel extends JPanel {
             timer.start();
         }
     }
+
+    private void stopAutoRefresh() {
+        if (timer != null && timer.isRunning()) {
+            timer.stop();
+        }
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        startAutoRefresh();
+    }
+
+    @Override
+    public void removeNotify() {
+        stopAutoRefresh();
+        super.removeNotify();
+    }
+
 
     private void convertToDate() {
         String input = timestampField.getText().trim();

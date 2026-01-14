@@ -32,7 +32,13 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
+
 
 @Slf4j
 public class FunctionalPanel extends SingletonBasePanel {
@@ -42,9 +48,15 @@ public class FunctionalPanel extends SingletonBasePanel {
     private StopButton stopBtn;    // 停止按钮
     private JLabel timeLabel;     // 执行时间标签
     private JLabel progressLabel; // 进度标签
+    private static final long PROGRESS_UPDATE_INTERVAL_MS = 200L;
+    private final AtomicLong lastProgressUpdate = new AtomicLong(0L);
+    private final AtomicReference<String> lastProgressText = new AtomicReference<>("");
     private long startTime;       // 记录开始时间
     private Timer executionTimer; // 执行时间计时器
     private volatile boolean isStopped = false; // 停止标志
+    private transient ExecutorService executionExecutor;
+    private transient Future<?> runningTask;
+
 
     // CSV 数据管理面板
     private CsvDataPanel csvDataPanel;
@@ -88,7 +100,8 @@ public class FunctionalPanel extends SingletonBasePanel {
 
         // 加载保存的配置
         this.persistenceService = SingletonFactory.getInstance(FunctionalPersistenceService.class);
-        loadSaved();
+        loadSavedAsync();
+
     }
 
     private JPanel createTopPanel() {
@@ -167,7 +180,11 @@ public class FunctionalPanel extends SingletonBasePanel {
         stopBtn.addActionListener(e -> {
             isStopped = true;
             stopBtn.setEnabled(false);
+            if (runningTask != null) {
+                runningTask.cancel(true);
+            }
         });
+
         btnPanel.add(stopBtn);
 
         JButton refreshBtn = new RefreshButton();
@@ -221,17 +238,43 @@ public class FunctionalPanel extends SingletonBasePanel {
         clearRunResults(rowCount);
         runBtn.setEnabled(false);
 
-        progressLabel.setText("0/" + totalExecutions);
+        lastProgressText.set("");
+        lastProgressUpdate.set(0L);
+        updateProgressLabel(0, totalExecutions);
+
 
         startTime = System.currentTimeMillis(); // 记录开始时间
         executionTimer = new Timer(100, e -> updateExecutionTime());
         executionTimer.start(); // 启动计时器
 
         final int finalIterations = iterations;
-        new Thread(() -> executeBatchRequestsWithCsv(rowCount, selectedCount, finalIterations)).start();
+        runningTask = getExecutionExecutor().submit(() -> executeBatchRequestsWithCsv(rowCount, selectedCount, finalIterations));
+
+    }
+
+    private void updateProgressLabel(int completed, int total) {
+        String text = completed + "/" + total;
+        long now = System.currentTimeMillis();
+        long lastUpdate = lastProgressUpdate.get();
+        String previousText = lastProgressText.get();
+
+        if (text.equals(previousText) && now - lastUpdate < PROGRESS_UPDATE_INTERVAL_MS) {
+            return;
+        }
+
+        lastProgressText.set(text);
+        lastProgressUpdate.set(now);
+
+        Runnable update = () -> progressLabel.setText(text);
+        if (SwingUtilities.isEventDispatchThread()) {
+            update.run();
+        } else {
+            SwingUtilities.invokeLater(update);
+        }
     }
 
     private void clearRunResults(int rowCount) {
+
         for (int i = 0; i < rowCount; i++) {
             RunnerRowData row = tableModel.getRow(i);
             if (row != null) {
@@ -292,8 +335,9 @@ public class FunctionalPanel extends SingletonBasePanel {
             }
 
             if (row.selected) {
-                finished = executeAndRecordRequest(row, currentCsvRow, iterationResult, finished, selectedCount, iterations);
+                finished = executeAndRecordRequest(row, currentCsvRow, iterationResult, finished, selectedCount, iterations, i);
             }
+
         }
 
         return finished;
@@ -309,16 +353,7 @@ public class FunctionalPanel extends SingletonBasePanel {
 
     private int executeAndRecordRequest(RunnerRowData row, Map<String, String> currentCsvRow,
                                         IterationResult iterationResult, int totalFinished,
-                                        int selectedCount, int iterations) {
-        // 找到当前行的索引
-        int rowIndex = -1;
-        for (int i = 0; i < tableModel.getRowCount(); i++) {
-            if (tableModel.getRow(i) == row) {
-                rowIndex = i;
-                break;
-            }
-        }
-
+                                        int selectedCount, int iterations, int rowIndex) {
         // 高亮当前执行的行
         final int currentRowIndex = rowIndex;
         if (currentRowIndex >= 0) {
@@ -327,6 +362,7 @@ public class FunctionalPanel extends SingletonBasePanel {
                 table.scrollRectToVisible(table.getCellRect(currentRowIndex, 0, true));
             });
         }
+
 
         BatchResult result = executeSingleRequestWithCsv(row, currentCsvRow);
 
@@ -355,7 +391,8 @@ public class FunctionalPanel extends SingletonBasePanel {
         iterationResult.addRequestResult(requestResult);
 
         int newTotalFinished = totalFinished + 1;
-        SwingUtilities.invokeLater(() -> progressLabel.setText(newTotalFinished + "/" + (selectedCount * iterations)));
+        updateProgressLabel(newTotalFinished, selectedCount * iterations);
+
 
         return newTotalFinished;
     }
@@ -364,6 +401,8 @@ public class FunctionalPanel extends SingletonBasePanel {
         SwingUtilities.invokeLater(() -> {
             runBtn.setEnabled(true);
             stopBtn.setEnabled(false);
+            runningTask = null;
+
 
             // 停止计时器
             stopExecutionTimer();
@@ -384,6 +423,27 @@ public class FunctionalPanel extends SingletonBasePanel {
             executionTimer.stop();
         }
     }
+
+    private ExecutorService getExecutionExecutor() {
+        if (executionExecutor == null) {
+            executionExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread thread = new Thread(r, "FunctionalRunner");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+        return executionExecutor;
+    }
+
+    @Override
+    public void removeNotify() {
+        if (executionExecutor != null) {
+            executionExecutor.shutdownNow();
+            executionExecutor = null;
+        }
+        super.removeNotify();
+    }
+
 
     private static class BatchResult {
         PreparedRequest req;
@@ -486,7 +546,10 @@ public class FunctionalPanel extends SingletonBasePanel {
 
         // 重置标签文本
         timeLabel.setText("0 ms");
+        lastProgressText.set("");
+        lastProgressUpdate.set(0L);
         progressLabel.setText("0/0");
+
     }
 
     private JScrollPane createTablePanel() {
@@ -755,21 +818,33 @@ public class FunctionalPanel extends SingletonBasePanel {
     /**
      * 加载保存的配置
      */
-    private void loadSaved() {
-        try {
-            List<RunnerRowData> savedRows = persistenceService.load();
-            if (savedRows != null && !savedRows.isEmpty()) {
-                for (RunnerRowData row : savedRows) {
-                    tableModel.addRow(row);
-                }
-                table.setEnabled(true);
-                runBtn.setEnabled(true);
-                log.info("Loaded {} saved test configurations", savedRows.size());
+    private void loadSavedAsync() {
+        SwingWorker<List<RunnerRowData>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<RunnerRowData> doInBackground() {
+                return persistenceService.load();
             }
-        } catch (Exception e) {
-            log.error("Failed to load saved config", e);
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    List<RunnerRowData> savedRows = get();
+                    if (savedRows != null && !savedRows.isEmpty()) {
+                        for (RunnerRowData row : savedRows) {
+                            tableModel.addRow(row);
+                        }
+                        table.setEnabled(true);
+                        runBtn.setEnabled(true);
+                        log.info("Loaded {} saved test configurations", savedRows.size());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to load saved config", e);
+                }
+            }
+        };
+        worker.execute();
     }
+
 
     /**
      * 保存当前配置

@@ -24,7 +24,10 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 
 
 /**
@@ -37,6 +40,8 @@ public class SidebarTabPanel extends SingletonBasePanel {
     private static final String ICON_LABEL_NAME = "iconLabel";
     private static final String TITLE_LABEL_NAME = "titleLabel";
     private static final String BUTTON_FOREGROUND_KEY = "Button.foreground";
+    private static final String LOADING_PANEL_NAME = "loadingPanel";
+
 
     @Getter
     private JTabbedPane tabbedPane;
@@ -53,6 +58,8 @@ public class SidebarTabPanel extends SingletonBasePanel {
     private boolean sidebarExpanded = false; // 侧边栏展开状态
     private CookieManagerDialog cookieManagerDialog; // Cookie管理器对话框实例
     private int lastSelectedIndex = -1; // 记录上一次选中的索引，用于优化颜色更新
+    private final Set<Integer> loadedTabIndexes = new HashSet<>();
+
 
     // 字体缓存，避免重复创建
     private Font normalFont;      // PLAIN 12 - Tab文本和版本号共用
@@ -90,9 +97,10 @@ public class SidebarTabPanel extends SingletonBasePanel {
         // Add tabs to the JTabbedPane
         for (int i = 0; i < tabInfos.size(); i++) {
             TabInfo info = tabInfos.get(i);
-            tabbedPane.addTab(info.title, new JPanel());
+            tabbedPane.addTab(info.title, createLoadingPanel());
             // 设置自定义 tab 组件以实现图标在上、文本在下的布局
             tabbedPane.setTabComponentAt(i, createTabComponent(info.title, info.icon));
+
         }
 
         // 默认设置选中第一个标签
@@ -391,29 +399,51 @@ public class SidebarTabPanel extends SingletonBasePanel {
             if (info.title.equals(I18nUtil.getMessage(MessageKeys.MENU_ENVIRONMENTS))) {
                 Component comp = tabbedPane.getComponentAt(selectedIndex);
                 if (comp instanceof EnvironmentPanel environmentPanel) {
-                    environmentPanel.refreshUI();
+                    environmentPanel.refreshUIIfNeeded();
                 }
             }
         }
     }
 
+
     private void ensureTabComponentLoaded(int index) {
-        if (index < 0 || index >= tabInfos.size()) return;
+        if (index < 0 || index >= tabInfos.size()) {
+            return;
+        }
+        if (loadedTabIndexes.contains(index)) {
+            return;
+        }
         TabInfo info = tabInfos.get(index);
-        Component comp = tabbedPane.getComponentAt(index);
-        if (comp == null || comp.getClass() == JPanel.class) {
+        tabbedPane.setComponentAt(index, createLoadingPanel());
+        SwingUtilities.invokeLater(() -> {
+            if (loadedTabIndexes.contains(index)) {
+                return;
+            }
             JPanel realPanel = info.getPanel(); // 懒加载真正的面板内容
             tabbedPane.setComponentAt(index, realPanel);
-        }
+            loadedTabIndexes.add(index);
+        });
     }
+
 
     /**
      * 创建现代化标签页
      */
+    private JPanel createLoadingPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setName(LOADING_PANEL_NAME);
+        panel.setOpaque(false);
+        JLabel label = new JLabel(I18nUtil.getMessage(MessageKeys.GENERAL_LOADING));
+        label.setForeground(ModernColors.getTextSecondary());
+        panel.add(label);
+        return panel;
+    }
+
     private JTabbedPane createModernTabbedPane() {
         JTabbedPane pane = new JTabbedPane(SwingConstants.LEFT, JTabbedPane.SCROLL_TAB_LAYOUT);
         pane.setForeground(ModernColors.getTextPrimary());
         pane.setFont(new Font(pane.getFont().getName(), Font.PLAIN, 14));
+
 
         // 自定义标签页UI
         pane.setUI(new BasicTabbedPaneUI() {
@@ -672,13 +702,19 @@ public class SidebarTabPanel extends SingletonBasePanel {
         // 创建新的 TabbedPane
         tabbedPane = createModernTabbedPane();
 
+        loadedTabIndexes.clear();
         // 恢复所有 tab - 重用 tabInfos 中缓存的图标
         for (int i = 0; i < tabInfos.size(); i++) {
             TabInfo info = tabInfos.get(i);
-            tabbedPane.addTab(info.title, loadedPanels.get(i));
+            Component panel = loadedPanels.get(i);
+            tabbedPane.addTab(info.title, panel);
+            if (!(panel instanceof JPanel tabPanel && LOADING_PANEL_NAME.equals(tabPanel.getName()))) {
+                loadedTabIndexes.add(i);
+            }
             // 设置自定义 tab 组件 - icon 从 tabInfos 获取，已经缓存
             tabbedPane.setTabComponentAt(i, createTabComponent(info.title, info.icon));
         }
+
 
         // 恢复选中的索引
         if (selectedIndex >= 0 && selectedIndex < tabbedPane.getTabCount()) {

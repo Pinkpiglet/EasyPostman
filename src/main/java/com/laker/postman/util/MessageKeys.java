@@ -34,44 +34,15 @@ public final class MessageKeys {
 
     // ============ 语言相关 ============
     public static final String LANGUAGE_CHANGED = "language.changed";
+    public static final String LANGUAGE_ENGLISH = "language.english";
+    public static final String LANGUAGE_CHINESE = "language.chinese";
 
     // ============ 主题相关 ============
     public static final String THEME_SWITCHED_TO_LIGHT = "theme.switched.to.light";
     public static final String THEME_SWITCHED_TO_DARK = "theme.switched.to.dark";
 
-    // ============ 更新相关 ============
-    public static final String UPDATE_NEW_VERSION_AVAILABLE = "update.new_version_available";
-    public static final String UPDATE_LATER = "update.later";
-    public static final String UPDATE_VIEW_DETAILS = "update.view_details";
-    public static final String UPDATE_MANUAL_DOWNLOAD = "update.manual_download";
-    public static final String UPDATE_DOWNLOADING = "update.downloading";
-    public static final String UPDATE_CONNECTING = "update.connecting";
-    public static final String UPDATE_CANCEL_DOWNLOAD = "update.cancel_download";
-    public static final String UPDATE_DOWNLOAD_CANCELLED = "update.download_cancelled";
-    public static final String UPDATE_DOWNLOAD_FAILED = "update.download_failed";
-    public static final String UPDATE_NO_INSTALLER_FOUND = "update.no_installer_found";
-
-    // ============ 全量静默更新相关 ============
-    public static final String UPDATE_INSTALLER_INSTALL_PROMPT = "update.installer.install.prompt";
-
-    // ============ 版本检查器相关 ============
-    public static final String UPDATE_FETCH_RELEASE_FAILED = "update.fetch_release_failed";
-    public static final String UPDATE_NO_VERSION_INFO = "update.no_version_info";
-    public static final String UPDATE_ALREADY_LATEST = "update.already_latest";
-    // ============ 更新日志相关 ============
-    public static final String CHANGELOG_TITLE = "changelog.title";
-    public static final String CHANGELOG_CURRENT_VERSION = "changelog.current_version";
-    public static final String CHANGELOG_LOADING = "changelog.loading";
-    public static final String CHANGELOG_LOAD_FAILED = "changelog.load_failed";
-    public static final String CHANGELOG_NO_RELEASES = "changelog.no_releases";
-    public static final String CHANGELOG_VIEW_ON_GITHUB = "changelog.view_on_github";
-    public static final String CHANGELOG_VIEW_ON_GITEE = "changelog.view_on_gitee";
-    public static final String CHANGELOG_CLOSE = "changelog.close";
-    public static final String CHANGELOG_REFRESH = "changelog.refresh";
-
-
     // ============ 错误消息 ============
-    public static final String ERROR_UPDATE_FAILED = "error.update_failed";
+
     public static final String ERROR_OPEN_LOG_MESSAGE = "error.open_log_message";
     public static final String ERROR_OPEN_LINK_FAILED = "error.open_link_failed";
     public static final String ERROR_NETWORK_TIMEOUT = "error.network_timeout";
@@ -102,6 +73,8 @@ public final class MessageKeys {
     public static final String GENERAL_OK = "general.ok";
     public static final String GENERAL_CANCEL = "button.cancel";
     public static final String GENERAL_SEARCH = "general.search";
+    public static final String GENERAL_LOADING = "general.loading";
+
     public static final String CONSOLE_TITLE = "console.title";
 
     // ============ 工作区选择对话框 ============
@@ -711,8 +684,9 @@ public final class MessageKeys {
     public static final String SETTINGS_REQUEST_SSL_VERIFICATION_TOOLTIP = "settings.request.ssl_verification.tooltip";
     public static final String SETTINGS_REQUEST_SSL_VERIFICATION_CHECKBOX = "settings.request.ssl_verification.checkbox";
 
-    // JMeter settings section
+    // ============ JMeter 设置相关 ============
     public static final String SETTINGS_JMETER_TITLE = "settings.jmeter.title";
+
     public static final String SETTINGS_JMETER_MAX_IDLE = "settings.jmeter.max_idle";
     public static final String SETTINGS_JMETER_MAX_IDLE_TOOLTIP = "settings.jmeter.max_idle.tooltip";
     public static final String SETTINGS_JMETER_KEEP_ALIVE = "settings.jmeter.keep_alive";
@@ -1031,24 +1005,6 @@ public final class MessageKeys {
     public static final String WORKSPACE_CONFIG_PROGRESS_FAILED = "workspace.config.progress.failed";
     public static final String WORKSPACE_VALIDATION_GIT_URL_INVALID = "workspace.validation.git.url.invalid";
 
-    // ============ 自动更新设置相关 ============
-    public static final String SETTINGS_AUTO_UPDATE_TITLE = "settings.auto_update.title";
-    public static final String SETTINGS_AUTO_UPDATE_ENABLED_TOOLTIP = "settings.auto_update.enabled.tooltip";
-    public static final String SETTINGS_AUTO_UPDATE_ENABLED_CHECKBOX = "settings.auto_update.enabled.checkbox";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY = "settings.auto_update.frequency";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY_TOOLTIP = "settings.auto_update.frequency.tooltip";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY_STARTUP = "settings.auto_update.frequency.startup";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY_DAILY = "settings.auto_update.frequency.daily";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY_WEEKLY = "settings.auto_update.frequency.weekly";
-    public static final String SETTINGS_AUTO_UPDATE_FREQUENCY_MONTHLY = "settings.auto_update.frequency.monthly";
-    public static final String SETTINGS_AUTO_UPDATE_LAST_CHECK_TIME = "settings.auto_update.last_check_time";
-    public static final String SETTINGS_AUTO_UPDATE_LAST_CHECK_TIME_TOOLTIP = "settings.auto_update.last_check_time.tooltip";
-    public static final String SETTINGS_AUTO_UPDATE_NEVER_CHECKED = "settings.auto_update.never_checked";
-    public static final String SETTINGS_UPDATE_SOURCE_PREFERENCE = "settings.update_source.preference";
-    public static final String SETTINGS_UPDATE_SOURCE_PREFERENCE_TOOLTIP = "settings.update_source.preference.tooltip";
-    public static final String SETTINGS_UPDATE_SOURCE_AUTO = "settings.update_source.auto";
-    public static final String SETTINGS_UPDATE_SOURCE_GITHUB = "settings.update_source.github";
-    public static final String SETTINGS_UPDATE_SOURCE_GITEE = "settings.update_source.gitee";
 
     // ============ UI设置相关 ============
     public static final String SETTINGS_UI_TITLE = "settings.ui.title";

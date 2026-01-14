@@ -39,6 +39,9 @@ public class WorkspacePanel extends SingletonBasePanel {
     private JPanel infoPanel;
     private JTextArea logArea;
     private transient WorkspaceService workspaceService;
+    private javax.swing.Timer refreshDebounceTimer;
+    private static final int REFRESH_DEBOUNCE_MS = 250;
+
 
     @Override
     protected void initUI() {
@@ -70,7 +73,8 @@ public class WorkspacePanel extends SingletonBasePanel {
         add(mainSplitPane, BorderLayout.CENTER);
 
         // 刷新工作区列表
-        refreshWorkspaceList();
+        requestWorkspaceRefresh();
+
     }
 
     /**
@@ -90,7 +94,8 @@ public class WorkspacePanel extends SingletonBasePanel {
 
         // 刷新按钮
         JButton refreshButton = new RefreshButton();
-        refreshButton.addActionListener(e -> refreshWorkspaceList());
+        refreshButton.addActionListener(e -> requestWorkspaceRefresh());
+
         toolbar.add(refreshButton);
 
         return toolbar;
@@ -200,7 +205,8 @@ public class WorkspacePanel extends SingletonBasePanel {
         dialog.setVisible(true);
 
         if (dialog.isConfirmed()) {
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
             // 更新顶部菜单栏的工作区下拉框（不需要重新加载整个菜单栏）
             SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceComboBox();
         }
@@ -345,7 +351,8 @@ public class WorkspacePanel extends SingletonBasePanel {
             SingletonFactory.getInstance(RequestCollectionsLeftPanel.class).switchWorkspaceAndRefreshUI(SystemUtil.getCollectionPathForWorkspace(workspace));
             // 更新顶部菜单栏工作区显示
             SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceDisplay();
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
         } catch (Exception e) {
             log.error("Failed to switch workspace", e);
         }
@@ -368,7 +375,8 @@ public class WorkspacePanel extends SingletonBasePanel {
                     .switchWorkspaceAndRefreshUI(SystemUtil.getCollectionPathForWorkspace(workspace));
             SingletonFactory.getInstance(EnvironmentPanel.class)
                     .switchWorkspaceAndRefreshUI(SystemUtil.getEnvPathForWorkspace(workspace));
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
         }
     }
 
@@ -384,7 +392,8 @@ public class WorkspacePanel extends SingletonBasePanel {
         dialog.setVisible(true);
 
         if (dialog.isConfirmed()) {
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
         }
     }
 
@@ -405,7 +414,8 @@ public class WorkspacePanel extends SingletonBasePanel {
                     .switchWorkspaceAndRefreshUI(SystemUtil.getCollectionPathForWorkspace(workspace));
             SingletonFactory.getInstance(EnvironmentPanel.class)
                     .switchWorkspaceAndRefreshUI(SystemUtil.getEnvPathForWorkspace(workspace));
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
         }
     }
 
@@ -422,7 +432,8 @@ public class WorkspacePanel extends SingletonBasePanel {
         if (newName != null && !newName.trim().isEmpty() && !newName.equals(workspace.getName())) {
             try {
                 workspaceService.renameWorkspace(workspace.getId(), newName.trim());
-                refreshWorkspaceList();
+                requestWorkspaceRefresh();
+
                 // 如果重命名的是当前工作区，更新顶部菜单栏的工作区下拉框
                 Workspace current = workspaceService.getCurrentWorkspace();
                 if (current != null && current.getId().equals(workspace.getId())) {
@@ -477,7 +488,8 @@ public class WorkspacePanel extends SingletonBasePanel {
                     }
                 }
 
-                refreshWorkspaceList();
+                requestWorkspaceRefresh();
+
                 SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceDisplay();
             } catch (Exception e) {
                 log.error("Failed to delete workspace", e);
@@ -504,7 +516,8 @@ public class WorkspacePanel extends SingletonBasePanel {
                         dialog.getPassword(),
                         dialog.getToken()
                 );
-                refreshWorkspaceList();
+                requestWorkspaceRefresh();
+
             } catch (Exception e) {
                 log.error("Failed to configure remote repository", e);
                 logError("Error: " + e.getMessage());
@@ -522,7 +535,8 @@ public class WorkspacePanel extends SingletonBasePanel {
         dialog.setVisible(true);
 
         if (dialog.isConfirmed()) {
-            refreshWorkspaceList();
+            requestWorkspaceRefresh();
+
             String logMessage = "Git authentication updated successfully for workspace: " + workspace.getName();
 
             // 如果更新了SSH密钥，添加额外提示
@@ -537,30 +551,57 @@ public class WorkspacePanel extends SingletonBasePanel {
     /**
      * 刷新工作区列表
      */
+    private void requestWorkspaceRefresh() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::requestWorkspaceRefresh);
+            return;
+        }
+        if (refreshDebounceTimer == null) {
+            refreshDebounceTimer = new javax.swing.Timer(REFRESH_DEBOUNCE_MS, e -> {
+                refreshDebounceTimer.stop();
+                refreshWorkspaceList();
+            });
+            refreshDebounceTimer.setRepeats(false);
+        }
+        refreshDebounceTimer.restart();
+    }
+
     private void refreshWorkspaceList() {
-        try {
-            List<Workspace> workspaces = workspaceService.getAllWorkspaces();
-            listModel.clear();
-            for (Workspace workspace : workspaces) {
-                listModel.addElement(workspace);
+        SwingWorker<List<Workspace>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<Workspace> doInBackground() {
+                return workspaceService.getAllWorkspaces();
             }
 
-            // 选中当前工作区
-            Workspace current = workspaceService.getCurrentWorkspace();
-            if (current != null) {
-                for (int i = 0; i < listModel.getSize(); i++) {
-                    if (listModel.getElementAt(i).getId().equals(current.getId())) {
-                        workspaceList.setSelectedIndex(i);
-                        break;
+            @Override
+            protected void done() {
+                try {
+                    List<Workspace> workspaces = get();
+                    listModel.clear();
+                    for (Workspace workspace : workspaces) {
+                        listModel.addElement(workspace);
                     }
+
+                    // 选中当前工作区
+                    Workspace current = workspaceService.getCurrentWorkspace();
+                    if (current != null) {
+                        for (int i = 0; i < listModel.getSize(); i++) {
+                            if (listModel.getElementAt(i).getId().equals(current.getId())) {
+                                workspaceList.setSelectedIndex(i);
+                                break;
+                            }
+                        }
+                    }
+
+                    updateInfoPanel();
+                } catch (Exception e) {
+                    log.error("Failed to refresh workspace list", e);
                 }
             }
-
-            updateInfoPanel();
-        } catch (Exception e) {
-            log.error("Failed to refresh workspace list", e);
-        }
+        };
+        worker.execute();
     }
+
 
     /**
      * 更新信息面板

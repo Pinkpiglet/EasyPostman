@@ -32,9 +32,11 @@ public class SplashWindow extends JWindow {
     private static final int FADE_TIMER_DELAY = 15; // 渐隐定时器延迟
 
     private JLabel statusLabel; // 状态标签，用于显示加载状态
+    private JProgressBar progressBar;
     private transient Timer fadeOutTimer; // 渐隐计时器
     private transient ActionListener fadeOutListener; // 渐隐监听器，用于防止内存泄漏
     private volatile boolean isDisposed = false; // 标记窗口是否已释放
+
 
 
     /**
@@ -172,13 +174,23 @@ public class SplashWindow extends JWindow {
      * 创建状态面板
      */
     private JPanel createStatusPanel() {
-        JPanel bottomPanel = new JPanel(new BorderLayout(0, 5));
+        JPanel bottomPanel = new JPanel();
         bottomPanel.setOpaque(false);
+        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
+
         statusLabel = new JLabel(I18nUtil.getMessage(MessageKeys.SPLASH_STATUS_STARTING), SwingConstants.CENTER);
         statusLabel.setFont(FontsUtil.getDefaultFontWithOffset(Font.PLAIN, +3)); // 比标准字体大3号
         statusLabel.setForeground(getTextColor());
-        bottomPanel.add(statusLabel, BorderLayout.CENTER);
+        statusLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+
+        progressBar = createProgressBar();
+        progressBar.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+
+        bottomPanel.add(statusLabel);
+        bottomPanel.add(Box.createVerticalStrut(8));
+        bottomPanel.add(progressBar);
         return bottomPanel;
+
     }
 
     /**
@@ -186,8 +198,9 @@ public class SplashWindow extends JWindow {
      */
     private void initializeWindow(JPanel content) {
         setContentPane(content);
-        setSize(350, 240); // 设置窗口大小
+        setSize(380, 260); // 设置窗口大小
         setLocationRelativeTo(null);  // 居中显示
+
 
         // 安全设置透明度和置顶
         setupWindowProperties();
@@ -223,13 +236,10 @@ public class SplashWindow extends JWindow {
 
                 boolean isDark = FlatLaf.isLafDark();
 
-                // 主题适配的渐变背景，与主题背景色 (60, 63, 65) 协调
-                Color gradientStart = isDark ? new Color(65, 67, 69) : ModernColors.PRIMARY;
-                Color gradientEnd = isDark ? new Color(55, 57, 59) : ModernColors.PRIMARY_LIGHTER;
-                GradientPaint gp = new GradientPaint(
-                        0, 0, gradientStart,
-                        getWidth(), getHeight(), gradientEnd
-                );
+                GradientPaint gp = isDark
+                        ? ModernColors.createDarkBackgroundGradient(getWidth(), getHeight())
+                        : ModernColors.createPrimaryToSecondaryGradient(getWidth(), getHeight());
+
                 g2d.setPaint(gp);
                 // 圆角背景
                 g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 32, 32);
@@ -259,11 +269,37 @@ public class SplashWindow extends JWindow {
         return content;
     }
 
+    private JProgressBar createProgressBar() {
+        JProgressBar bar = new JProgressBar(0, 100);
+        bar.setValue(0);
+        bar.setBorderPainted(false);
+        bar.setStringPainted(false);
+        bar.setOpaque(true);
+        bar.setBackground(getProgressTrackColor());
+        bar.setForeground(getProgressFillColor());
+        bar.setPreferredSize(new Dimension(220, 6));
+        bar.setMaximumSize(new Dimension(220, 6));
+        return bar;
+    }
+
+    private void updateProgressBar(int value) {
+        if (progressBar == null) {
+            return;
+        }
+        Runnable update = () -> progressBar.setValue(Math.min(100, Math.max(0, value)));
+        if (SwingUtilities.isEventDispatchThread()) {
+            update.run();
+        } else {
+            SwingUtilities.invokeLater(update);
+        }
+    }
+
     public void setStatus(String statusKey) {
         if (!isDisposed) {
             SwingUtilities.invokeLater(() -> updateStatusLabel(statusKey));
         }
     }
+
 
     /**
      * 更新状态标签
@@ -324,8 +360,14 @@ public class SplashWindow extends JWindow {
                 });
             }
         };
+        worker.addPropertyChangeListener(evt -> {
+            if ("progress".equals(evt.getPropertyName())) {
+                updateProgressBar((Integer) evt.getNewValue());
+            }
+        });
         worker.execute();
     }
+
 
     /**
      * 确保最小显示时间
@@ -476,6 +518,14 @@ public class SplashWindow extends JWindow {
         return FlatLaf.isLafDark();
     }
 
+    private Color getProgressFillColor() {
+        return isDarkTheme() ? ModernColors.PRIMARY_LIGHT : ModernColors.whiteWithAlpha(235);
+    }
+
+    private Color getProgressTrackColor() {
+        return isDarkTheme() ? ModernColors.whiteWithAlpha(35) : ModernColors.whiteWithAlpha(90);
+    }
+
     /**
      * 获取主题适配的文字颜色
      */
@@ -483,6 +533,7 @@ public class SplashWindow extends JWindow {
         // 暗色主题使用更亮的文字颜色，提升可读性
         return isDarkTheme() ? new Color(230, 230, 230) : ModernColors.whiteWithAlpha(220);
     }
+
 
     /**
      * 获取主题适配的装饰点颜色

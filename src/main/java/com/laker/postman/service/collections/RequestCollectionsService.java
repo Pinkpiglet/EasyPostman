@@ -38,12 +38,38 @@ public class RequestCollectionsService {
 
     public static void restoreOpenedRequests() {
         List<HttpRequestItem> requestItems = OpenedRequestsService.getAll();
-        for (HttpRequestItem item : requestItems) {
-            RequestEditSubPanel panel = RequestsTabsService.addTab(item);
-            RequestsTabsService.updateTabNew(panel, item.isNewRequest());
+        if (requestItems.isEmpty()) {
+            OpenedRequestsService.clear();
+            return;
         }
-        OpenedRequestsService.clear();
+
+        Runnable task = () -> {
+            final int batchSize = 5;
+            final int[] index = {0};
+            Timer timer = new Timer(10, null);
+            timer.addActionListener(e -> {
+                int end = Math.min(index[0] + batchSize, requestItems.size());
+                for (int i = index[0]; i < end; i++) {
+                    HttpRequestItem item = requestItems.get(i);
+                    RequestEditSubPanel panel = RequestsTabsService.addTab(item);
+                    RequestsTabsService.updateTabNew(panel, item.isNewRequest());
+                }
+                index[0] = end;
+                if (index[0] >= requestItems.size()) {
+                    timer.stop();
+                    OpenedRequestsService.clear();
+                }
+            });
+            timer.start();
+        };
+
+        if (SwingUtilities.isEventDispatchThread()) {
+            task.run();
+        } else {
+            SwingUtilities.invokeLater(task);
+        }
     }
+
 
     /**
      * 根据ID查找请求节点

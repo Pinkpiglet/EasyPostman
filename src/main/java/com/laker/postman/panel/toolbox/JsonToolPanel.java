@@ -28,6 +28,8 @@ public class JsonToolPanel extends JPanel {
     private RSyntaxTextArea inputArea;
     private RSyntaxTextArea outputArea;
     private JLabel statusLabel;
+    private transient SwingWorker<Object, Void> jsonWorker;
+
 
     public JsonToolPanel() {
         initUI();
@@ -203,19 +205,16 @@ public class JsonToolPanel extends JPanel {
             return;
         }
 
-        try {
-            String formatted = JsonUtil.formatJson5(input);
+        runJsonTask(() -> JsonUtil.formatJson5(input), result -> {
+            String formatted = (String) result;
             outputArea.setText(formatted);
             int lines = formatted.split("\n").length;
             String message = I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_FORMATTED,
                     String.valueOf(lines), String.valueOf(formatted.length()));
             updateStatus(message, true);
-        } catch (Exception ex) {
-            log.error("JSON format error", ex);
-            outputArea.setText("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ":\n\n" + ex.getMessage());
-            updateStatus("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ": " + ex.getMessage(), false);
-        }
+        });
     }
+
 
     /**
      * 压缩JSON
@@ -228,20 +227,17 @@ public class JsonToolPanel extends JPanel {
             return;
         }
 
-        try {
-            String compressed = JSONUtil.toJsonStr(JSONUtil.parse(input));
+        runJsonTask(() -> JSONUtil.toJsonStr(JSONUtil.parse(input)), result -> {
+            String compressed = (String) result;
             outputArea.setText(compressed);
             int reduction = input.length() - compressed.length();
             double percent = (reduction * 100.0) / input.length();
             String message = I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_COMPRESSED,
                     String.valueOf(reduction), String.format("%.1f", percent));
             updateStatus(message, true);
-        } catch (Exception ex) {
-            log.error("JSON compress error", ex);
-            outputArea.setText("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ":\n\n" + ex.getMessage());
-            updateStatus("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ": " + ex.getMessage(), false);
-        }
+        });
     }
+
 
     /**
      * 验证JSON
@@ -254,36 +250,31 @@ public class JsonToolPanel extends JPanel {
             return;
         }
 
-        try {
+        runJsonTask(() -> {
             Object parsed = JSONUtil.parse(input);
             String type = parsed.getClass().getSimpleName();
             int lines = input.split("\n").length;
             int chars = input.length();
 
-            // 统计JSON结构信息
             StringBuilder info = new StringBuilder();
             info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_VALID)).append("\n\n");
             info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_TYPE)).append(": ").append(type).append("\n");
             info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_CHARACTERS)).append(": ").append(chars).append("\n");
             info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_LINES)).append(": ").append(lines).append("\n");
 
-            // 尝试统计键值对数量
             if (parsed instanceof cn.hutool.json.JSONObject obj) {
                 info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_KEYS)).append(": ").append(obj.size()).append("\n");
             } else if (parsed instanceof cn.hutool.json.JSONArray arr) {
                 info.append(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_ARRAY_LENGTH)).append(": ").append(arr.size()).append("\n");
             }
-
-            outputArea.setText(info.toString());
-            String message = I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_VALIDATED, type);
-            updateStatus(message, true);
-        } catch (Exception ex) {
-            log.error("JSON validate error", ex);
-            String errorMsg = "❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ":\n\n" + ex.getMessage();
-            outputArea.setText(errorMsg);
-            updateStatus(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_INVALID), false);
-        }
+            return new ValidationResult(info.toString(), type);
+        }, result -> {
+            ValidationResult validationResult = (ValidationResult) result;
+            outputArea.setText(validationResult.info);
+            updateStatus(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_VALIDATED, validationResult.type), true);
+        });
     }
+
 
     /**
      * Escape JSON字符串（转义特殊字符）
@@ -323,8 +314,7 @@ public class JsonToolPanel extends JPanel {
             return;
         }
 
-        try {
-            // 反转义
+        runJsonTask(() -> {
             String unescaped = input
                     .replace("\\\"", "\"")
                     .replace("\\\\", "\\")
@@ -332,7 +322,6 @@ public class JsonToolPanel extends JPanel {
                     .replace("\\r", "\r")
                     .replace("\\t", "\t");
 
-            // 处理Unicode转义
             Pattern pattern = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
             Matcher matcher = pattern.matcher(unescaped);
             StringBuilder sb = new StringBuilder();
@@ -342,14 +331,61 @@ public class JsonToolPanel extends JPanel {
                 matcher.appendReplacement(sb, String.valueOf(ch));
             }
             matcher.appendTail(sb);
-
-            outputArea.setText(sb.toString());
+            return sb.toString();
+        }, text -> {
+            outputArea.setText((String) text);
             updateStatus(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_UNESCAPED), true);
-        } catch (Exception ex) {
-            log.error("Unescape error", ex);
-            updateStatus("❌ " + ex.getMessage(), false);
+        });
+    }
+
+    private void runJsonTask(java.util.concurrent.Callable<Object> task, java.util.function.Consumer<Object> onSuccess) {
+        if (jsonWorker != null && !jsonWorker.isDone()) {
+            jsonWorker.cancel(true);
+        }
+        jsonWorker = new SwingWorker<Object, Void>() {
+            @Override
+            protected Object doInBackground() throws Exception {
+                return task.call();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    onSuccess.accept(get());
+                } catch (Exception ex) {
+                    handleJsonTaskError(ex);
+                }
+            }
+        };
+        jsonWorker.execute();
+    }
+
+    private void handleJsonTaskError(Exception ex) {
+        log.error("JSON task error", ex);
+        outputArea.setText("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ":\n\n" + ex.getMessage());
+        updateStatus("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ": " + ex.getMessage(), false);
+    }
+
+    private static class ValidationResult {
+        private final String info;
+        private final String type;
+
+        private ValidationResult(String info, String type) {
+            this.info = info;
+            this.type = type;
         }
     }
+
+    private static class SortResult {
+        private final String text;
+        private final boolean success;
+
+        private SortResult(String text, boolean success) {
+            this.text = text;
+            this.success = success;
+        }
+    }
+
 
     /**
      * 排序JSON的键
@@ -362,24 +398,23 @@ public class JsonToolPanel extends JPanel {
             return;
         }
 
-        try {
+        runJsonTask(() -> {
             Object parsed = JSONUtil.parse(input);
-            // 使用有序的JSONObject来保持键的排序
             if (parsed instanceof cn.hutool.json.JSONObject obj) {
-                String sorted = JsonUtil.toJsonPrettyStr(sortJsonObject(obj));
-                outputArea.setText(sorted);
-                updateStatus(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_SORTED), true);
-            } else {
-                outputArea.setText(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_NOT_OBJECT) + "\n\n" +
-                        I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_TYPE) + ": " + parsed.getClass().getSimpleName());
-                updateStatus(I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_NOT_OBJECT), false);
+                return new SortResult(JsonUtil.toJsonPrettyStr(sortJsonObject(obj)), true);
             }
-        } catch (Exception ex) {
-            log.error("Sort keys error", ex);
-            outputArea.setText("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ":\n\n" + ex.getMessage());
-            updateStatus("❌ " + I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_ERROR) + ": " + ex.getMessage(), false);
-        }
+            String message = I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_NOT_OBJECT) + "\n\n" +
+                    I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_VALIDATION_TYPE) + ": " + parsed.getClass().getSimpleName();
+            return new SortResult(message, false);
+        }, result -> {
+            SortResult sortResult = (SortResult) result;
+            outputArea.setText(sortResult.text);
+            updateStatus(sortResult.success
+                    ? I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_SORTED)
+                    : I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON_STATUS_NOT_OBJECT), sortResult.success);
+        });
     }
+
 
     /**
      * 递归排序JSON对象的键

@@ -78,6 +78,9 @@ public class RequestBodyPanel extends JPanel {
     private DefaultListModel<String> autocompleteModel;
     private Map<String, String> currentVariables;
     private int autocompleteStartPos = -1;
+    private Timer autocompleteTimer;
+    private static final int AUTOCOMPLETE_DEBOUNCE_MS = 120;
+
 
     @Setter
     private transient ActionListener wsSendActionListener; // 外部注入的发送回调
@@ -636,19 +639,20 @@ public class RequestBodyPanel extends JPanel {
         bodyArea.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                SwingUtilities.invokeLater(() -> checkForAutocomplete());
+                requestAutocompleteUpdate();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                SwingUtilities.invokeLater(() -> checkForAutocomplete());
+                requestAutocompleteUpdate();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                SwingUtilities.invokeLater(() -> checkForAutocomplete());
+                requestAutocompleteUpdate();
             }
         });
+
 
         // 文本框键盘事件
         bodyArea.addKeyListener(new KeyAdapter() {
@@ -878,10 +882,23 @@ public class RequestBodyPanel extends JPanel {
         });
     }
 
+    private void requestAutocompleteUpdate() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::requestAutocompleteUpdate);
+            return;
+        }
+        if (autocompleteTimer == null) {
+            autocompleteTimer = new Timer(AUTOCOMPLETE_DEBOUNCE_MS, e -> checkForAutocomplete());
+            autocompleteTimer.setRepeats(false);
+        }
+        autocompleteTimer.restart();
+    }
+
     /**
      * 检查是否需要显示自动补全 - 与 EasyPostmanTextField 保持一致
      */
     private void checkForAutocomplete() {
+
         if (bodyArea == null || autocompleteWindow == null) return;
 
         String text = bodyArea.getText();

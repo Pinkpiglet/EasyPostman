@@ -57,6 +57,13 @@ public class EnvironmentPanel extends SingletonBasePanel {
     private ImportButton importBtn;
     private String originalVariablesSnapshot; // 原始变量快照，直接用json字符串
     private boolean isLoadingData = false; // 用于控制是否正在加载数据，防止自动保存
+    private String lastRefreshDataFilePath;
+    private String lastRefreshEnvironmentId;
+    private int lastEnvironmentCount = -1;
+    private javax.swing.Timer searchDebounceTimer;
+    private static final int SEARCH_DEBOUNCE_MS = 250;
+    private String pendingSearchText = "";
+
 
     @Override
     protected void initUI() {
@@ -191,17 +198,18 @@ public class EnvironmentPanel extends SingletonBasePanel {
         }
         searchField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
-                reloadEnvironmentList(searchField.getText());
+                requestReloadEnvironmentList(searchField.getText());
             }
 
             public void removeUpdate(DocumentEvent e) {
-                reloadEnvironmentList(searchField.getText());
+                requestReloadEnvironmentList(searchField.getText());
             }
 
             public void changedUpdate(DocumentEvent e) {
-                reloadEnvironmentList(searchField.getText());
+                requestReloadEnvironmentList(searchField.getText());
             }
         });
+
         environmentList.addListSelectionListener(e -> { // 监听环境列表左键
             if (!e.getValueIsAdjusting()) {
                 EnvironmentItem item = environmentList.getSelectedValue();
@@ -540,9 +548,19 @@ public class EnvironmentPanel extends SingletonBasePanel {
         }
     }
 
+    private void requestReloadEnvironmentList(String filter) {
+        pendingSearchText = filter == null ? "" : filter;
+        if (searchDebounceTimer == null) {
+            searchDebounceTimer = new javax.swing.Timer(SEARCH_DEBOUNCE_MS, e -> reloadEnvironmentList(pendingSearchText));
+            searchDebounceTimer.setRepeats(false);
+        }
+        searchDebounceTimer.restart();
+    }
+
     private void reloadEnvironmentList(String filter) {
         environmentListModel.clear();
         java.util.List<Environment> envs = EnvironmentService.getAllEnvironments();
+
         int activeIdx = -1;
         for (Environment env : envs) {
             if (filter == null || filter.isEmpty() || env.getName().toLowerCase().contains(filter.toLowerCase())) {
@@ -630,36 +648,69 @@ public class EnvironmentPanel extends SingletonBasePanel {
     /**
      * 刷新整个环境面板（列表和变量表格，保持激活环境高亮和选中）
      */
-    public void refreshUI() {
-        // 获取当前激活环境id
-        Environment active = EnvironmentService.getActiveEnvironment();
-        String activeId = active != null ? active.getId() : null;
-        // 重新加载环境列表
-        environmentListModel.clear();
-        java.util.List<Environment> envs = EnvironmentService.getAllEnvironments();
-        int selectIdx = -1;
-        for (int i = 0; i < envs.size(); i++) {
-            Environment env = envs.get(i);
-            EnvironmentItem item = new EnvironmentItem(env);
-            environmentListModel.addElement(item);
-            if (activeId != null && activeId.equals(env.getId())) {
-                selectIdx = i;
-            }
-        }
-        // 先取消选中再选中，强制触发 selection 事件，保证表格刷新
-        environmentList.clearSelection();
-        if (selectIdx >= 0) {
-            environmentList.setSelectedIndex(selectIdx);
-            environmentList.ensureIndexIsVisible(selectIdx);
-        }
-        // 强制刷新变量表格，防止selection事件未触发
-        EnvironmentItem selectedItem = environmentList.getSelectedValue();
-        if (selectedItem != null) {
-            loadVariables(selectedItem.getEnvironment());
-        } else {
-            variablesTablePanel.clear();
-        }
-    }
+     public void refreshUI() {
+         // 获取当前激活环境id
+         Environment active = EnvironmentService.getActiveEnvironment();
+         String activeId = active != null ? active.getId() : null;
+         // 重新加载环境列表
+         environmentListModel.clear();
+         java.util.List<Environment> envs = EnvironmentService.getAllEnvironments();
+         int selectIdx = -1;
+         for (int i = 0; i < envs.size(); i++) {
+             Environment env = envs.get(i);
+             EnvironmentItem item = new EnvironmentItem(env);
+             environmentListModel.addElement(item);
+             if (activeId != null && activeId.equals(env.getId())) {
+                 selectIdx = i;
+             }
+         }
+         // 先取消选中再选中，强制触发 selection 事件，保证表格刷新
+         environmentList.clearSelection();
+         if (selectIdx >= 0) {
+             environmentList.setSelectedIndex(selectIdx);
+             environmentList.ensureIndexIsVisible(selectIdx);
+         }
+         // 强制刷新变量表格，防止selection事件未触发
+         EnvironmentItem selectedItem = environmentList.getSelectedValue();
+         if (selectedItem != null) {
+             loadVariables(selectedItem.getEnvironment());
+         } else {
+             variablesTablePanel.clear();
+         }
+         updateRefreshSnapshot();
+     }
+
+     public void refreshUIIfNeeded() {
+         if (shouldRefreshUI()) {
+             refreshUI();
+         }
+     }
+
+     private boolean shouldRefreshUI() {
+         if (lastEnvironmentCount < 0) {
+             return true;
+         }
+         String dataFilePath = EnvironmentService.getDataFilePath();
+         Environment active = EnvironmentService.getActiveEnvironment();
+         String activeId = active != null ? active.getId() : null;
+         int envCount = EnvironmentService.getAllEnvironments().size();
+
+         if (!java.util.Objects.equals(lastRefreshDataFilePath, dataFilePath)) {
+             return true;
+         }
+         if (!java.util.Objects.equals(lastRefreshEnvironmentId, activeId)) {
+             return true;
+         }
+         return envCount != lastEnvironmentCount;
+     }
+
+     private void updateRefreshSnapshot() {
+         lastRefreshDataFilePath = EnvironmentService.getDataFilePath();
+         Environment active = EnvironmentService.getActiveEnvironment();
+         lastRefreshEnvironmentId = active != null ? active.getId() : null;
+         lastEnvironmentCount = EnvironmentService.getAllEnvironments().size();
+     }
+
 
     // 判断当前表格内容和快照是否一致，使用JSON序列化比较
     private boolean isVariablesChanged() {

@@ -99,6 +99,9 @@ public class RequestEditSubPanel extends JPanel {
     private boolean isUpdatingFromParams = false;
     // 数据加载标志，防止加载时触发自动保存和联动更新
     private boolean isLoadingData = false;
+    private javax.swing.Timer urlParamsSyncTimer;
+    private static final int URL_PARAMS_SYNC_DEBOUNCE_MS = 120;
+
     @Getter
     private final ResponsePanel responsePanel;
 
@@ -144,17 +147,18 @@ public class RequestEditSubPanel extends JPanel {
         urlField = requestLinePanel.getUrlField();
         urlField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
-                parseUrlParamsToParamsPanel();
+                requestUrlParamsSync();
             }
 
             public void removeUpdate(DocumentEvent e) {
-                parseUrlParamsToParamsPanel();
+                requestUrlParamsSync();
             }
 
             public void changedUpdate(DocumentEvent e) {
-                parseUrlParamsToParamsPanel();
+                requestUrlParamsSync();
             }
         });
+
         // 自动补全URL协议
         urlField.addFocusListener(new FocusAdapter() {
             @Override
@@ -960,17 +964,34 @@ public class RequestEditSubPanel extends JPanel {
         return item;
     }
 
+    private void requestUrlParamsSync() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::requestUrlParamsSync);
+            return;
+        }
+        if (urlParamsSyncTimer == null) {
+            urlParamsSyncTimer = new javax.swing.Timer(URL_PARAMS_SYNC_DEBOUNCE_MS, e -> parseUrlParamsToParamsPanel());
+            urlParamsSyncTimer.setRepeats(false);
+        }
+        urlParamsSyncTimer.restart();
+    }
+
     /**
      * 解析url中的参数到paramsPanel，并与现有params合并去重
      */
     private void parseUrlParamsToParamsPanel() {
+
         if (isUpdatingFromParams) {
             return; // 如果正在从Params更新URL，避免循环更新
         }
 
         isUpdatingFromUrl = true;
         try {
+            if (isLoadingData) {
+                return;
+            }
             String url = urlField.getText();
+
             List<HttpParam> urlParams = HttpUtil.getParamsListFromUrl(url);
 
             // 获取当前Params面板的参数

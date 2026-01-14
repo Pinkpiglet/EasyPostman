@@ -101,8 +101,12 @@ public class MemoryLabel extends JLabel {
         refreshTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                if (!isShowing()) {
+                    return;
+                }
                 SwingUtilities.invokeLater(() -> updateMemoryInfo());
             }
+
         }, 0, refreshInterval);
     }
 

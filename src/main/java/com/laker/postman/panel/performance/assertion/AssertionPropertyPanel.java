@@ -36,9 +36,11 @@ public class AssertionPropertyPanel extends JPanel {
         gbc.anchor = GridBagConstraints.CENTER;
         typeCombo = new JComboBox<>(new String[]{
                 "Response Code",
+                "Response Time",
                 "Contains",
                 "JSONPath"
         });
+
         add(typeCombo, gbc);
 
         // 输入区采用CardLayout
@@ -99,8 +101,10 @@ public class AssertionPropertyPanel extends JPanel {
         jsonPathPanel.add(jsonPathExpectField, jpGbc);
 
         inputPanel.add(responseCodePanel, "Response Code");
+        inputPanel.add(responseCodePanel, "Response Time");
         inputPanel.add(containsPanel, "Contains");
         inputPanel.add(jsonPathPanel, "JSONPath");
+
         add(inputPanel, gbc);
 
         // 帮助说明
@@ -108,7 +112,8 @@ public class AssertionPropertyPanel extends JPanel {
         gbc.gridx = 0;
         gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
-        JLabel helpLabel = new JLabel("<html>\n<ul style='margin-left:10px'>\n<li><b>Response Code</b>: 断言响应码，支持 <b>=</b>、<b>></b>、<b><</b>，如 <code>=200</code> 表示响应码等于200</li>\n<li><b>Contains</b>: 断言响应体包含指定内容，输入要查找的字符串即可</li>\n<li><b>JSONPath</b>: 断言响应体通过 JSONPath 表达式提取的值等于对比值，支持如 <code>$.data[0].id</code> 语法</li>\n</ul>\n</html>");
+        JLabel helpLabel = new JLabel("<html>\n<ul style='margin-left:10px'>\n<li><b>Response Code</b>: 断言响应码，支持 <b>=</b>、<b>></b>、<b><</b>，如 <code>=200</code> 表示响应码等于200</li>\n<li><b>Response Time</b>: 断言响应耗时（毫秒），如 <code><500</code> 表示响应时间小于500ms</li>\n<li><b>Contains</b>: 断言响应体包含指定内容，输入要查找的字符串即可</li>\n<li><b>JSONPath</b>: 断言响应体通过 JSONPath 表达式提取的值等于对比值，支持如 <code>$.data[0].id</code> 语法</li>\n</ul>\n</html>");
+
         helpLabel.setFont(helpLabel.getFont().deriveFont(Font.PLAIN, 12f));
         add(helpLabel, gbc);
 
@@ -119,7 +124,15 @@ public class AssertionPropertyPanel extends JPanel {
     private void updateFieldVisibility() {
         String type = (String) typeCombo.getSelectedItem();
         inputCardLayout.show(inputPanel, type);
+        if ("Response Time".equals(type)) {
+            responseCodeValueField.setToolTipText("响应耗时（ms）");
+        } else if ("Response Code".equals(type)) {
+            responseCodeValueField.setToolTipText("响应码");
+        } else {
+            responseCodeValueField.setToolTipText(null);
+        }
     }
+
 
     public void setAssertionData(JMeterTreeNode node) {
         this.currentNode = node;
@@ -129,7 +142,7 @@ public class AssertionPropertyPanel extends JPanel {
             node.assertionData = data;
         }
         typeCombo.setSelectedItem(data.type);
-        if ("Response Code".equals(data.type)) {
+        if ("Response Code".equals(data.type) || "Response Time".equals(data.type)) {
             operatorCombo.setSelectedItem(data.operator);
             responseCodeValueField.setText(data.value);
         } else if ("Contains".equals(data.type)) {
@@ -138,6 +151,7 @@ public class AssertionPropertyPanel extends JPanel {
             jsonPathField.setText(data.value);
             jsonPathExpectField.setText(data.content);
         }
+
         updateFieldVisibility();
     }
 
@@ -149,7 +163,7 @@ public class AssertionPropertyPanel extends JPanel {
             currentNode.assertionData = data;
         }
         data.type = (String) typeCombo.getSelectedItem();
-        if ("Response Code".equals(data.type)) {
+        if ("Response Code".equals(data.type) || "Response Time".equals(data.type)) {
             data.operator = (String) operatorCombo.getSelectedItem();
             data.value = responseCodeValueField.getText();
             data.content = "";
@@ -162,5 +176,6 @@ public class AssertionPropertyPanel extends JPanel {
             data.content = jsonPathExpectField.getText();
             data.operator = "=";
         }
+
     }
 }

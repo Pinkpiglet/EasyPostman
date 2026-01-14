@@ -24,6 +24,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
 
 /**
  * 功能测试配置持久化服务
@@ -34,6 +40,15 @@ import java.util.List;
 public class FunctionalPersistenceService {
     private static final String FILE_PATH = SystemUtil.getUserHomeEasyPostmanPath() + "functional_config.json";
     private static final long MAX_FILE_SIZE = 2L * 1024 * 1024; // 2MB
+    private static final long SAVE_DEBOUNCE_MS = 400L;
+
+    private final ScheduledExecutorService saveExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "FunctionalConfigSave");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicReference<ScheduledFuture<?>> pendingSave = new AtomicReference<>();
+
 
     @PostConstruct
     public void init() {
@@ -85,10 +100,13 @@ public class FunctionalPersistenceService {
      * 异步保存配置
      */
     public void saveAsync(List<RunnerRowData> rows) {
-        Thread saveThread = new Thread(() -> save(rows));
-        saveThread.setDaemon(true);
-        saveThread.start();
+        ScheduledFuture<?> previous = pendingSave.getAndSet(
+                saveExecutor.schedule(() -> save(rows), SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+        if (previous != null) {
+            previous.cancel(false);
+        }
     }
+
 
     /**
      * 加载功能测试配置

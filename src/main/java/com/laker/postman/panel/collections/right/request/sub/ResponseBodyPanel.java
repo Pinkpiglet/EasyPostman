@@ -47,7 +47,9 @@ public class ResponseBodyPanel extends JPanel {
     private final JButton prevButton;
     private final JButton nextButton;
     private final JToggleButton wrapButton;
+    private transient SwingWorker<String, Void> formatWorker;
     RTextScrollPane scrollPane;
+
 
     // 常量定义
     private static final int LARGE_RESPONSE_THRESHOLD = 500 * 1024; // 500KB threshold
@@ -481,19 +483,48 @@ public class ResponseBodyPanel extends JPanel {
         int syntaxIndex = SyntaxType.getBySyntaxStyle(syntax).getIndex();
         syntaxComboBox.setSelectedIndex(syntaxIndex);
 
-        // 设置语法高亮和文本
+        // 设置语法高亮
         responseBodyPane.setSyntaxEditingStyle(syntax);
-        responseBodyPane.setText(text);
 
-        // 根据设置和大小决定是否自动格式化
-        if (SettingManager.isAutoFormatResponse() && textSize < MAX_AUTO_FORMAT_SIZE) {
-            autoFormatIfPossible(text, contentType);
-        } else if (SettingManager.isAutoFormatResponse() && textSize >= MAX_AUTO_FORMAT_SIZE) {
-            // 大文件不自动格式化，提示用户手动格式化
-            sizeWarningLabel.setText(sizeWarningLabel.getText() + SKIP_AUTO_FORMAT_MESSAGE);
+        if (formatWorker != null) {
+            formatWorker.cancel(true);
+            formatWorker = null;
         }
 
-        responseBodyPane.setCaretPosition(0);
+        boolean shouldAutoFormat = SettingManager.isAutoFormatResponse()
+                && textSize < MAX_AUTO_FORMAT_SIZE
+                && isFormatSupported(contentType);
+
+        if (shouldAutoFormat) {
+            responseBodyPane.setText(I18nUtil.getMessage(MessageKeys.GENERAL_LOADING));
+            formatWorker = new SwingWorker<>() {
+                @Override
+                protected String doInBackground() {
+                    return formatContent(text, contentType);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        String formatted = get();
+                        responseBodyPane.setText(formatted);
+                    } catch (Exception ex) {
+                        responseBodyPane.setText(text);
+                    } finally {
+                        responseBodyPane.setCaretPosition(0);
+                    }
+                }
+            };
+            formatWorker.execute();
+        } else {
+            responseBodyPane.setText(text);
+            if (SettingManager.isAutoFormatResponse() && textSize >= MAX_AUTO_FORMAT_SIZE) {
+                // 大文件不自动格式化，提示用户手动格式化
+                sizeWarningLabel.setText(sizeWarningLabel.getText() + SKIP_AUTO_FORMAT_MESSAGE);
+            }
+            responseBodyPane.setCaretPosition(0);
+        }
+
     }
 
     /**
@@ -531,41 +562,32 @@ public class ResponseBodyPanel extends JPanel {
         return SyntaxConstants.SYNTAX_STYLE_NONE;
     }
 
-    /**
-     * 自动格式化内容（如果可能）
-     * <p>
-     * 只有在满足以下条件时才会自动格式化：
-     * 1. 用户开启了自动格式化设置
-     * 2. 文件大小小于阈值（500KB）
-     * 3. 内容类型为 JSON 或 XML
-     * </p>
-     *
-     * @param text        文本内容
-     * @param contentType Content-Type 响应头
-     */
-    private void autoFormatIfPossible(String text, String contentType) {
-        if (text == null || text.isEmpty()) {
-            return;
+    private boolean isFormatSupported(String contentType) {
+        if (contentType == null) {
+            return false;
         }
-
-        int textSize = text.getBytes().length;
-
-        // 小文件直接格式化
-        if (textSize < LARGE_RESPONSE_THRESHOLD) {
-            try {
-                if (contentType != null && contentType.toLowerCase().contains("json")) {
-                    String pretty = JsonUtil.toJsonPrettyStr(text);
-                    responseBodyPane.setText(pretty);
-                } else if (contentType != null && contentType.toLowerCase().contains("xml")) {
-                    String pretty = XmlUtil.format(text);
-                    responseBodyPane.setText(pretty);
-                }
-            } catch (Exception ex) {
-                // 格式化失败时静默忽略，保持原始内容
-            }
-        }
-        // 大文件不自动格式化
+        String lower = contentType.toLowerCase();
+        return lower.contains("json") || lower.contains("xml");
     }
+
+    private String formatContent(String text, String contentType) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        try {
+            String lower = contentType != null ? contentType.toLowerCase() : "";
+            if (lower.contains("json")) {
+                return JsonUtil.toJsonPrettyStr(text);
+            }
+            if (lower.contains("xml")) {
+                return XmlUtil.format(text);
+            }
+        } catch (Exception ex) {
+            // ignore and return raw text
+        }
+        return text;
+    }
+
 
     @Override
     public void setEnabled(boolean enabled) {

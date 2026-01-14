@@ -24,6 +24,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
 
 /**
  * 性能测试配置持久化服务
@@ -34,6 +40,15 @@ import java.nio.file.Paths;
 public class PerformancePersistenceService {
     private static final String FILE_PATH = SystemUtil.getUserHomeEasyPostmanPath() + "performance_config.json";
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024; // 5MB
+    private static final long SAVE_DEBOUNCE_MS = 400L;
+
+    private final ScheduledExecutorService saveExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "PerformanceConfigSave");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicReference<ScheduledFuture<?>> pendingSave = new AtomicReference<>();
+
 
     @PostConstruct
     public void init() {
@@ -96,10 +111,13 @@ public class PerformancePersistenceService {
      * @param efficientMode 是否开启高效模式
      */
     public void saveAsync(DefaultMutableTreeNode rootNode, boolean efficientMode) {
-        Thread saveThread = new Thread(() -> save(rootNode, efficientMode));
-        saveThread.setDaemon(true);
-        saveThread.start();
+        ScheduledFuture<?> previous = pendingSave.getAndSet(
+                saveExecutor.schedule(() -> save(rootNode, efficientMode), SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+        if (previous != null) {
+            previous.cancel(false);
+        }
     }
+
 
     /**
      * 序列化树节点（递归）

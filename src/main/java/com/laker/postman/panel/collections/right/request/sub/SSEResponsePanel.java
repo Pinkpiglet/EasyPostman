@@ -34,6 +34,9 @@ public class SSEResponsePanel extends JPanel {
     private final JTextField searchField;
     private final JButton clearButton;
     private final List<MessageRow> allRows = new ArrayList<>();
+    private Timer filterTimer;
+    private static final int FILTER_DEBOUNCE_MS = 120;
+
 
     private static final String[] COLUMN_NAMES = {
             I18nUtil.getMessage(MessageKeys.WEBSOCKET_COLUMN_TYPE),
@@ -176,30 +179,32 @@ public class SSEResponsePanel extends JPanel {
         clearButton.addActionListener(e -> clearMessages());
         searchField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
-                filterAndShow();
+                requestFilterUpdate();
             }
 
             public void removeUpdate(DocumentEvent e) {
-                filterAndShow();
+                requestFilterUpdate();
             }
 
             public void changedUpdate(DocumentEvent e) {
-                filterAndShow();
+                requestFilterUpdate();
             }
         });
-        typeFilterBox.addActionListener(e -> filterAndShow());
+        typeFilterBox.addActionListener(e -> requestFilterUpdate());
+
     }
 
 
     public void addMessage(MessageType messageType, String time, String content, List<TestResult> testResults) {
         allRows.add(new MessageRow(messageType, time, content, testResults));
-        SwingUtilities.invokeLater(this::filterAndShow);
+        requestFilterUpdate();
     }
 
     public void clearMessages() {
         allRows.clear();
-        SwingUtilities.invokeLater(this::filterAndShow);
+        requestFilterUpdate();
     }
+
 
     private static Icon getSummaryIcon(List<TestResult> testResults) {
         if (testResults == null || testResults.isEmpty()) {
@@ -222,12 +227,25 @@ public class SSEResponsePanel extends JPanel {
         }
     }
 
+    private void requestFilterUpdate() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::requestFilterUpdate);
+            return;
+        }
+        if (filterTimer == null) {
+            filterTimer = new Timer(FILTER_DEBOUNCE_MS, e -> filterAndShow());
+            filterTimer.setRepeats(false);
+        }
+        filterTimer.restart();
+    }
+
     private void filterAndShow() {
         // 确保在 EDT 内执行
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(this::filterAndShow);
             return;
         }
+
         String search = searchField.getText().trim().toLowerCase();
         String typeFilter = (String) typeFilterBox.getSelectedItem();
         List<MessageRow> filtered = allRows.stream()

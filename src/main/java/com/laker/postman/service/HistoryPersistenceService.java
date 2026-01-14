@@ -21,6 +21,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
 
 /**
  * 历史记录持久化管理器
@@ -36,8 +42,16 @@ public class HistoryPersistenceService {
     private static final int MAX_REQUEST_BODY_SIZE = 10 * 1024;
     // 限制文件大小 (50MB)
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
+    private static final long SAVE_DEBOUNCE_MS = 500L;
 
     private final List<RequestHistoryItem> historyItems = new CopyOnWriteArrayList<>();
+    private final ScheduledExecutorService saveExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "HistorySave");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicReference<ScheduledFuture<?>> pendingSave = new AtomicReference<>();
+
 
     @PostConstruct
     public void init() {
@@ -116,10 +130,13 @@ public class HistoryPersistenceService {
      * 异步保存历史记录
      */
     private void saveHistoryAsync() {
-        Thread saveThread = new Thread(this::saveHistory);
-        saveThread.setDaemon(true);
-        saveThread.start();
+        ScheduledFuture<?> previous = pendingSave.getAndSet(
+                saveExecutor.schedule(this::saveHistory, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS));
+        if (previous != null) {
+            previous.cancel(false);
+        }
     }
+
 
     /**
      * 截断过大的body内容

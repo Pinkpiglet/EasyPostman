@@ -21,6 +21,9 @@ import java.util.Map;
 public class ResponseHeadersPanel extends JPanel {
     private final JTable headersTable;
     private final DefaultTableModel tableModel;
+    private transient SwingWorker<List<Object[]>, Void> loadWorker;
+    private Map<String, List<String>> pendingHeaders;
+
 
     public ResponseHeadersPanel() {
         setLayout(new BorderLayout());
@@ -83,15 +86,48 @@ public class ResponseHeadersPanel extends JPanel {
     }
 
     public void setHeaders(Map<String, List<String>> headers) {
+        pendingHeaders = headers;
+        if (loadWorker != null) {
+            loadWorker.cancel(true);
+        }
         tableModel.setRowCount(0);
-        if (headers == null || headers.isEmpty()) return;
+        if (headers == null || headers.isEmpty()) {
+            return;
+        }
+        loadWorker = new SwingWorker<>() {
+            @Override
+            protected List<Object[]> doInBackground() {
+                return flattenHeaders(headers);
+            }
+
+            @Override
+            protected void done() {
+                if (pendingHeaders != headers) {
+                    return;
+                }
+                try {
+                    for (Object[] row : get()) {
+                        tableModel.addRow(row);
+                    }
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        };
+        loadWorker.execute();
+    }
+
+    private List<Object[]> flattenHeaders(Map<String, List<String>> headers) {
+        List<Object[]> rows = new java.util.ArrayList<>();
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
             String key = entry.getKey();
             for (String value : entry.getValue()) {
-                tableModel.addRow(new Object[]{key, value});
+                rows.add(new Object[]{key, value});
             }
         }
+        return rows;
     }
+
 
     private void copySelectedRows() {
         int[] rows = headersTable.getSelectedRows();

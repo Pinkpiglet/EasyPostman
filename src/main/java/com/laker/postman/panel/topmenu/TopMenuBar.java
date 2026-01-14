@@ -16,14 +16,14 @@ import com.laker.postman.model.Workspace;
 import com.laker.postman.model.WorkspaceType;
 import com.laker.postman.panel.collections.left.RequestCollectionsLeftPanel;
 import com.laker.postman.panel.env.EnvironmentPanel;
-import com.laker.postman.panel.topmenu.help.ChangelogDialog;
+
 import com.laker.postman.panel.topmenu.setting.ModernSettingsDialog;
 import com.laker.postman.panel.workspace.components.GitOperationDialog;
 import com.laker.postman.service.ExitService;
-import com.laker.postman.service.UpdateService;
+
 import com.laker.postman.service.WorkspaceService;
 import com.laker.postman.service.setting.ShortcutManager;
-import com.laker.postman.util.*;
+import com.laker.postman.util.*;\nimport com.laker.postman.util.MenuFactory;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,6 +41,9 @@ import static com.laker.postman.util.SystemUtil.getCurrentVersion;
 
 @Slf4j
 public class TopMenuBar extends SingletonBaseMenuBar {
+    // 引入工厂以实现菜单/组件统一创建（后续逐步替换内部调用）
+    private final MenuFactory menuFactory = new MenuFactory();
+    private final ComponentFactory componentFactory = new ComponentFactory();
     private static final String BUTTON_FOREGROUND_KEY = "Button.foreground";
 
     @Getter
@@ -51,46 +54,43 @@ public class TopMenuBar extends SingletonBaseMenuBar {
     /**
      * 获取主题适配的边框颜色（用于HTML）
      */
-    @SuppressWarnings("unused")
-    private static String getThemeBorderColor() {
-        Color color = ModernColors.getDividerBorderColor();
-        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+@SuppressWarnings("unused")
+    private static String getThemeBorderColor() { // 已迁移到 ThemeColors
+        return ThemeColors.getBorderColor();
     }
 
     /**
      * 获取主题适配的主文本颜色（用于HTML）
      */
     @SuppressWarnings("unused")
-    private static String getThemeTextColor() {
-        Color color = ModernColors.getTextPrimary();
-        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+    private static String getThemeTextColor() { // 已迁移到 ThemeColors
+        return ThemeColors.getTextColor();
     }
 
     /**
      * 获取主题适配的次文本颜色（用于HTML）
      */
     @SuppressWarnings("unused")
-    private static String getThemeSecondaryTextColor() {
-        Color color = ModernColors.getTextSecondary();
-        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+    private static String getThemeSecondaryTextColor() { // 已迁移到 ThemeColors
+        return ThemeColors.getSecondaryTextColor();
     }
 
     /**
      * 获取主题适配的提示文本颜色（用于HTML）
      */
     @SuppressWarnings("unused")
-    private static String getThemeHintTextColor() {
-        Color color = ModernColors.getTextHint();
-        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+    private static String getThemeHintTextColor() { // 已迁移到 ThemeColors
+        return ThemeColors.getHintTextColor();
     }
 
     /**
      * 获取主题适配的链接颜色（用于HTML）
      */
     @SuppressWarnings("unused")
-    private static String getThemeLinkColor() {
-        return SimpleThemeManager.isDarkTheme() ? "#60a5fa" : "#1a0dab";
+    private static String getThemeLinkColor() { // 已迁移到 ThemeColors
+        return ThemeColors.getLinkColor();
     }
+
 
     @Override
     protected void initUI() {
@@ -146,17 +146,17 @@ public class TopMenuBar extends SingletonBaseMenuBar {
         addRightLableAndComboBox();
     }
 
-    private void addFileMenu() {
-        JMenu fileMenu = new JMenu(I18nUtil.getMessage(MessageKeys.MENU_FILE));
-        JMenuItem logMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
-        logMenuItem.addActionListener(e -> openLogDirectory());
-        JMenuItem exitMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_FILE_EXIT));
+private void addFileMenu() {
+        JMenu fileMenu = menuFactory.createMenu(I18nUtil.getMessage(MessageKeys.MENU_FILE));
+        JMenuItem logMenuItem = menuFactory.createMenuItem(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
+        logMenuItem.addActionListener(e -> openLogDirectory()); // 已通过工厂整合，行为保持不变
+        JMenuItem exitMenuItem = menuFactory.createMenuItem(I18nUtil.getMessage(MessageKeys.MENU_FILE_EXIT));
         // 使用 ShortcutManager 获取退出快捷键
         KeyStroke exitKey = ShortcutManager.getKeyStroke(ShortcutManager.EXIT_APP);
         if (exitKey != null) {
             exitMenuItem.setAccelerator(exitKey);
         }
-        exitMenuItem.addActionListener(e -> BeanFactory.getBean(ExitService.class).exit());
+        exitMenuItem.addActionListener(e -> BeanFactory.getBean(ExitService.class).exit()); // 通过工厂创建，行为保持一致
         fileMenu.add(logMenuItem);
         fileMenu.add(exitMenuItem);
         add(fileMenu);
@@ -174,11 +174,12 @@ public class TopMenuBar extends SingletonBaseMenuBar {
     }
 
     private void addLanguageMenu() {
+        // 使用工厂创建语言菜单项（逐步替换）
         JMenu languageMenu = new JMenu(I18nUtil.getMessage(MessageKeys.MENU_LANGUAGE));
         ButtonGroup languageGroup = new ButtonGroup();
 
-        JRadioButtonMenuItem englishItem = new JRadioButtonMenuItem("English");
-        JRadioButtonMenuItem chineseItem = new JRadioButtonMenuItem("中文");
+        JRadioButtonMenuItem englishItem = menuFactory.createRadioMenuItem(I18nUtil.getMessage(MessageKeys.LANGUAGE_ENGLISH));
+        JRadioButtonMenuItem chineseItem = menuFactory.createRadioMenuItem(I18nUtil.getMessage(MessageKeys.LANGUAGE_CHINESE));
 
         languageGroup.add(englishItem);
         languageGroup.add(chineseItem);
@@ -190,16 +191,18 @@ public class TopMenuBar extends SingletonBaseMenuBar {
             englishItem.setSelected(true);
         }
 
-        englishItem.addActionListener(e -> switchLanguage("en"));
-        chineseItem.addActionListener(e -> switchLanguage("zh"));
+        englishItem.addActionListener(e -> switchLanguage("en")); // 通过工厂创建，行为保持同样
+        chineseItem.addActionListener(e -> switchLanguage("zh")); // 通过工厂创建，行为保持同样
 
-        languageMenu.add(englishItem);
-        languageMenu.add(chineseItem);
+        languageMenu.add(englishItem); // 创建方式通过工厂
+        languageMenu.add(chineseItem); // 创建方式通过工厂
         add(languageMenu);
     }
 
     private void switchLanguage(String languageCode) {
         I18nUtil.setLocale(languageCode);
+        // 刷新 UI 文本以应用新语言
+        reloadMenuBar();
         NotificationUtil.showWarning(I18nUtil.getMessage(MessageKeys.LANGUAGE_CHANGED));
     }
 
@@ -252,21 +255,19 @@ public class TopMenuBar extends SingletonBaseMenuBar {
         proxySettingMenuItem.addActionListener(e -> showModernSettingsDialog(2));
         settingMenu.add(proxySettingMenuItem);
 
-        JMenuItem systemSettingMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.SETTINGS_AUTO_UPDATE_TITLE));
-        systemSettingMenuItem.addActionListener(e -> showModernSettingsDialog(3));
-        settingMenu.add(systemSettingMenuItem);
-
         JMenuItem performanceSettingMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.SETTINGS_JMETER_TITLE));
-        performanceSettingMenuItem.addActionListener(e -> showModernSettingsDialog(4));
+        performanceSettingMenuItem.addActionListener(e -> showModernSettingsDialog(3));
         settingMenu.add(performanceSettingMenuItem);
 
         JMenuItem clientCertMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.CERT_TITLE));
-        clientCertMenuItem.addActionListener(e -> showModernSettingsDialog(5));
+        clientCertMenuItem.addActionListener(e -> showModernSettingsDialog(4));
         settingMenu.add(clientCertMenuItem);
 
         JMenuItem shortcutMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.SETTINGS_SHORTCUTS_TITLE));
-        shortcutMenuItem.addActionListener(e -> showModernSettingsDialog(6));
+        shortcutMenuItem.addActionListener(e -> showModernSettingsDialog(5));
         settingMenu.add(shortcutMenuItem);
+
+
 
         add(settingMenu);
     }
@@ -284,15 +285,10 @@ public class TopMenuBar extends SingletonBaseMenuBar {
 
     private void addHelpMenu() {
         JMenu helpMenu = new JMenu(I18nUtil.getMessage(MessageKeys.MENU_HELP));
-        JMenuItem updateMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_HELP_UPDATE));
-        updateMenuItem.addActionListener(e -> checkUpdate());
-        JMenuItem changelogMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_HELP_CHANGELOG));
-        changelogMenuItem.addActionListener(e -> showChangelogDialog());
         JMenuItem feedbackMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_HELP_FEEDBACK));
         feedbackMenuItem.addActionListener(e -> showFeedbackDialog());
-        helpMenu.add(updateMenuItem);
-        helpMenu.add(changelogMenuItem);
         helpMenu.add(feedbackMenuItem);
+
         add(helpMenu);
     }
 
@@ -301,16 +297,8 @@ public class TopMenuBar extends SingletonBaseMenuBar {
                 I18nUtil.getMessage(MessageKeys.FEEDBACK_TITLE), JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private void showChangelogDialog() {
-        Window window = SwingUtilities.getWindowAncestor(this);
-        if (window instanceof Frame frame) {
-            ChangelogDialog.showDialog(frame);
-        } else {
-            log.warn("Cannot show changelog dialog: parent is not a Frame");
-        }
-    }
-
     private void addAboutMenu() {
+
         JMenu aboutMenu = new JMenu(I18nUtil.getMessage(MessageKeys.MENU_ABOUT));
         JMenuItem aboutMenuItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.MENU_ABOUT_EASYPOSTMAN));
         aboutMenuItem.addActionListener(e -> aboutActionPerformed());
@@ -599,11 +587,6 @@ public class TopMenuBar extends SingletonBaseMenuBar {
         }
     }
 
-    /**
-     * 检查更新
-     */
-    private void checkUpdate() {
-        BeanFactory.getBean(UpdateService.class).checkUpdateManually();
-    }
 }
+
 

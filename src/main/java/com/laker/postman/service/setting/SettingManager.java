@@ -309,95 +309,14 @@ public class SettingManager {
         save();
     }
 
-    // ===== 自动更新设置 =====
-
-    /**
-     * 是否启用自动检查更新
-     */
-    public static boolean isAutoUpdateCheckEnabled() {
-        String val = props.getProperty("auto_update_check_enabled");
-        if (val != null) {
-            return Boolean.parseBoolean(val);
-        }
-        return true; // 默认开启
-    }
-
-    public static void setAutoUpdateCheckEnabled(boolean enabled) {
-        props.setProperty("auto_update_check_enabled", String.valueOf(enabled));
-        save();
-    }
-
-    /**
-     * 获取更新检查频率
-     * 支持的值：startup（每次启动）、daily（每日）、weekly（每周）、monthly（每月）
-     */
-    public static String getAutoUpdateCheckFrequency() {
-        String val = props.getProperty("auto_update_check_frequency");
-        if (val != null && (val.equals("startup") || val.equals("daily") || val.equals("weekly") || val.equals("monthly"))) {
-            return val;
-        }
-        return "daily"; // 默认每日
-    }
-
-    public static void setAutoUpdateCheckFrequency(String frequency) {
-        if (frequency != null && (frequency.equals("startup") || frequency.equals("daily") || frequency.equals("weekly") || frequency.equals("monthly"))) {
-            props.setProperty("auto_update_check_frequency", frequency);
-            save();
-        }
-    }
-
-    /**
-     * 获取上次检查更新的时间戳（毫秒）
-     */
-    public static long getLastUpdateCheckTime() {
-        String val = props.getProperty("last_update_check_time");
-        if (val != null) {
-            try {
-                return Long.parseLong(val);
-            } catch (NumberFormatException e) {
-                return 0L;
-            }
-        }
-        return 0L; // 0表示从未检查过
-    }
-
-    /**
-     * 设置上次检查更新的时间戳（毫秒）
-     */
-    public static void setLastUpdateCheckTime(long timestamp) {
-        props.setProperty("last_update_check_time", String.valueOf(timestamp));
-        save();
-    }
-
-    /**
-     * 更新源偏好设置
-     * 支持的值：
-     * - "auto": 自动选择最快的源（默认）
-     * - "github": 始终使用 GitHub
-     * - "gitee": 始终使用 Gitee
-     */
-    public static String getUpdateSourcePreference() {
-        String val = props.getProperty("update_source_preference");
-        if (val != null && (val.equals("github") || val.equals("gitee") || val.equals("auto"))) {
-            return val;
-        }
-        // 默认自动选择
-        return "auto";
-    }
-
-    public static void setUpdateSourcePreference(String preference) {
-        if (preference != null && (preference.equals("auto") || preference.equals("github") || preference.equals("gitee"))) {
-            props.setProperty("update_source_preference", preference);
-            save();
-        }
-    }
-
     // ===== 网络代理设置 =====
+
 
     /**
      * 是否启用网络代理
      */
     public static boolean isProxyEnabled() {
+
         String val = props.getProperty("proxy_enabled");
         if (val != null) {
             return Boolean.parseBoolean(val);

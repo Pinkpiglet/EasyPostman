@@ -9,6 +9,12 @@ import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
+
 
 /**
  * 现代化统一设置对话框
@@ -26,7 +32,11 @@ public class ModernSettingsDialog extends JDialog {
     private static final int TAB_MARGIN = 2;
     private static final int TAB_PADDING = 4;
 
+    private static ModernSettingsDialog sharedDialog;
     private final JTabbedPane tabbedPane;
+    private final List<Supplier<JComponent>> tabFactories = new ArrayList<>();
+    private final Set<Integer> loadedTabs = new HashSet<>();
+
 
     /**
      * 获取主题适配的背景色
@@ -86,21 +96,17 @@ public class ModernSettingsDialog extends JDialog {
     }
 
     private void addSettingTabs() {
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_GENERAL_TITLE),
-                new UISettingsPanelModern());
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_REQUEST_TITLE),
-                new RequestSettingsPanelModern());
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_PROXY_TITLE),
-                new ProxySettingsPanelModern());
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_AUTO_UPDATE_TITLE),
-                new AutoUpdateSettingsPanel());
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_JMETER_TITLE),
-                new PerformanceSettingsPanelModern());
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.CERT_TITLE),
-                new ClientCertificateSettingsPanelModern(this));
-        tabbedPane.addTab(I18nUtil.getMessage(MessageKeys.SETTINGS_SHORTCUTS_TITLE),
-                new ShortcutSettingsPanel());
+        addLazyTab(I18nUtil.getMessage(MessageKeys.SETTINGS_GENERAL_TITLE), UISettingsPanelModern::new);
+        addLazyTab(I18nUtil.getMessage(MessageKeys.SETTINGS_REQUEST_TITLE), RequestSettingsPanelModern::new);
+        addLazyTab(I18nUtil.getMessage(MessageKeys.SETTINGS_PROXY_TITLE), ProxySettingsPanelModern::new);
+        addLazyTab(I18nUtil.getMessage(MessageKeys.SETTINGS_JMETER_TITLE), PerformanceSettingsPanelModern::new);
+        addLazyTab(I18nUtil.getMessage(MessageKeys.CERT_TITLE), () -> new ClientCertificateSettingsPanelModern(this));
+        addLazyTab(I18nUtil.getMessage(MessageKeys.SETTINGS_SHORTCUTS_TITLE), ShortcutSettingsPanel::new);
+
+        tabbedPane.addChangeListener(e -> ensureTabLoaded(tabbedPane.getSelectedIndex()));
+        ensureTabLoaded(0);
     }
+
 
     private void setupMainPanel() {
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -108,6 +114,32 @@ public class ModernSettingsDialog extends JDialog {
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
         setContentPane(mainPanel);
     }
+
+    private void addLazyTab(String title, Supplier<JComponent> factory) {
+        tabFactories.add(factory);
+        tabbedPane.addTab(title, createLoadingPanel());
+    }
+
+    private JPanel createLoadingPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(getBackgroundColor());
+        JLabel label = new JLabel(I18nUtil.getMessage(MessageKeys.GENERAL_LOADING));
+        label.setForeground(getTextColor());
+        panel.add(label);
+        return panel;
+    }
+
+    private void ensureTabLoaded(int tabIndex) {
+        if (tabIndex < 0 || tabIndex >= tabFactories.size() || loadedTabs.contains(tabIndex)) {
+            return;
+        }
+        JComponent component = tabFactories.get(tabIndex).get();
+        tabbedPane.setComponentAt(tabIndex, component);
+        loadedTabs.add(tabIndex);
+        tabbedPane.revalidate();
+        tabbedPane.repaint();
+    }
+
 
     private void setupIcon() {
         try {
@@ -253,10 +285,26 @@ public class ModernSettingsDialog extends JDialog {
      * @param tabIndex 要打开的标签页索引
      */
     public static void showSettings(Window parent, int tabIndex) {
-        ModernSettingsDialog dialog = new ModernSettingsDialog(parent);
+        ModernSettingsDialog dialog = getOrCreate(parent);
         dialog.selectTab(tabIndex);
         dialog.setVisible(true);
     }
+
+    private static ModernSettingsDialog getOrCreate(Window parent) {
+        if (sharedDialog == null || !sharedDialog.isDisplayable() || sharedDialog.getOwner() != parent) {
+            sharedDialog = new ModernSettingsDialog(parent);
+        }
+        return sharedDialog;
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        if (sharedDialog == this) {
+            sharedDialog = null;
+        }
+    }
+
 
     /**
      * 选择指定的标签页
@@ -265,7 +313,9 @@ public class ModernSettingsDialog extends JDialog {
      */
     private void selectTab(int tabIndex) {
         if (tabIndex >= 0 && tabIndex < tabbedPane.getTabCount()) {
+            ensureTabLoaded(tabIndex);
             tabbedPane.setSelectedIndex(tabIndex);
         }
     }
+
 }

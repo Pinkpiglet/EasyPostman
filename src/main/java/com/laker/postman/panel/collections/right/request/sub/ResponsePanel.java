@@ -32,18 +32,28 @@ public class ResponsePanel extends JPanel {
     private final JLabel statusCodeLabel;
     private final JLabel responseTimeLabel;
     private final JLabel responseSizeLabel;
-    private final ResponseHeadersPanel responseHeadersPanel;
-    private final ResponseBodyPanel responseBodyPanel;
-    private final NetworkLogPanel networkLogPanel;
-    private final TimelinePanel timelinePanel;
-    private final JEditorPane testsPane;
+    private static final int HTTP_TAB_BODY = 0;
+    private static final int HTTP_TAB_HEADERS = 1;
+    private static final int HTTP_TAB_TESTS = 2;
+    private static final int HTTP_TAB_NETWORK_LOG = 3;
+    private static final int HTTP_TAB_TIMING = 4;
+    private static final int HTTP_TAB_SSE_LOG = 5;
+
+    private ResponseHeadersPanel responseHeadersPanel;
+    private ResponseBodyPanel responseBodyPanel;
+    private NetworkLogPanel networkLogPanel;
+    private TimelinePanel timelinePanel;
+    private JEditorPane testsPane;
     private final JButton[] tabButtons;
     private int selectedTabIndex = 0;
     private final JPanel cardPanel;
     private final String[] tabNames;
     private final RequestItemProtocolEnum protocol;
-    private final WebSocketResponsePanel webSocketResponsePanel;
-    private final SSEResponsePanel sseResponsePanel;
+    private WebSocketResponsePanel webSocketResponsePanel;
+    private SSEResponsePanel sseResponsePanel;
+    private final List<java.util.function.Supplier<JComponent>> responseTabFactories = new ArrayList<>();
+    private final java.util.Set<Integer> loadedResponseTabs = new java.util.HashSet<>();
+
 
     public ResponsePanel(RequestItemProtocolEnum protocol) {
         this(protocol, true); // 默认启用保存按钮
@@ -145,35 +155,39 @@ public class ResponsePanel extends JPanel {
             topResponseBar.add(statusBar, BorderLayout.EAST);
             add(topResponseBar, BorderLayout.NORTH);
             cardPanel = new JPanel(new CardLayout());
-            responseBodyPanel = new ResponseBodyPanel(enableSaveButton); // 根据参数决定是否启用保存按钮
-            responseBodyPanel.setEnabled(false);
-            responseBodyPanel.setBodyText(null);
-            responseHeadersPanel = new ResponseHeadersPanel();
-            JPanel testsPanel = new JPanel(new BorderLayout());
-            testsPane = new JEditorPane();
-            testsPane.setContentType("text/html");
-            testsPane.setEditable(false);
-            JScrollPane testsScrollPane = new JScrollPane(testsPane);
-            testsPanel.add(testsScrollPane, BorderLayout.CENTER);
-            networkLogPanel = new NetworkLogPanel();
-            timelinePanel = new TimelinePanel(new ArrayList<>(), null);
-
-            // 按照指定顺序添加到 cardPanel
-            // [Response Body] [Response Headers] [Tests] [Network Log] [Timing] [Log]
-            cardPanel.add(responseBodyPanel, tabNames[0]);
-            cardPanel.add(responseHeadersPanel, tabNames[1]);
-            cardPanel.add(testsPanel, tabNames[2]);
-            cardPanel.add(networkLogPanel, tabNames[3]);
-            cardPanel.add(new JScrollPane(timelinePanel), tabNames[4]);
-            sseResponsePanel = new SSEResponsePanel();
-            cardPanel.add(sseResponsePanel, tabNames[5]);
+            addHttpTab(tabNames[HTTP_TAB_BODY], () -> {
+                responseBodyPanel = new ResponseBodyPanel(enableSaveButton);
+                responseBodyPanel.setEnabled(false);
+                responseBodyPanel.setBodyText(null);
+                return responseBodyPanel;
+            });
+            addHttpTab(tabNames[HTTP_TAB_HEADERS], () -> {
+                responseHeadersPanel = new ResponseHeadersPanel();
+                return responseHeadersPanel;
+            });
+            addHttpTab(tabNames[HTTP_TAB_TESTS], this::createTestsPanel);
+            addHttpTab(tabNames[HTTP_TAB_NETWORK_LOG], () -> {
+                networkLogPanel = new NetworkLogPanel();
+                return networkLogPanel;
+            });
+            addHttpTab(tabNames[HTTP_TAB_TIMING], () -> {
+                timelinePanel = new TimelinePanel(new ArrayList<>(), null);
+                return new JScrollPane(timelinePanel);
+            });
+            addHttpTab(tabNames[HTTP_TAB_SSE_LOG], () -> {
+                sseResponsePanel = new SSEResponsePanel();
+                return sseResponsePanel;
+            });
+            ensureResponseTabLoaded(HTTP_TAB_BODY);
             webSocketResponsePanel = null;
+
         }
         add(cardPanel, BorderLayout.CENTER);
 
         for (int i = 0; i < tabButtons.length; i++) {
             final int idx = i;
             tabButtons[i].addActionListener(e -> {
+                ensureResponseTabLoaded(idx);
                 CardLayout cl = (CardLayout) cardPanel.getLayout();
                 cl.show(cardPanel, tabNames[idx]);
                 selectedTabIndex = idx;
@@ -182,6 +196,7 @@ public class ResponsePanel extends JPanel {
                 }
             });
         }
+
         // 默认所有按钮不可用
         setResponseTabButtonsEnable(false);
     }
@@ -197,11 +212,19 @@ public class ResponsePanel extends JPanel {
             // WebSocket 和 SSE 响应体由专门的面板维护，不做处理
             return;
         }
-        responseBodyPanel.setBodyText(resp);
+        ResponseBodyPanel panel = getResponseBodyPanel();
+        if (panel != null) {
+            panel.setBodyText(resp);
+        }
     }
 
+
     public void setResponseHeaders(HttpResponse resp) {
-        responseHeadersPanel.setHeaders(resp.headers);
+        ResponseHeadersPanel panel = getResponseHeadersPanel();
+        if (panel != null) {
+            panel.setHeaders(resp.headers);
+        }
+
         // 动态设置Headers按钮文本和颜色
         int headersTabIndex = 1;
         if (tabButtons.length > headersTabIndex) {
@@ -219,16 +242,20 @@ public class ResponsePanel extends JPanel {
     }
 
     public void setTiming(HttpResponse resp) {
-        if (timelinePanel == null) return;
+        TimelinePanel panel = getTimelinePanel();
+        if (panel == null) {
+            return;
+        }
         List<TimelinePanel.Stage> stages = new ArrayList<>();
         HttpEventInfo info = null;
         if (resp != null && resp.httpEventInfo != null) {
             info = resp.httpEventInfo;
             stages = TimelinePanel.buildStandardStages(info);
         }
-        timelinePanel.setStages(stages);
-        timelinePanel.setHttpEventInfo(info);
+        panel.setStages(stages);
+        panel.setHttpEventInfo(info);
     }
+
 
     public void setStatusRequesting() {
         statusCodeLabel.setText(String.format(I18nUtil.getMessage(MessageKeys.STATUS_STATUS, "...")));
@@ -395,10 +422,14 @@ public class ResponsePanel extends JPanel {
     }
 
     public void setTestResults(List<TestResult> testResults) {
-        if (testsPane == null) return; // 防止 NPE
+        JEditorPane pane = getTestsPane();
+        if (pane == null) {
+            return;
+        }
         String html = HttpHtmlRenderer.renderTestResults(testResults);
-        testsPane.setText(html);
-        testsPane.setCaretPosition(0);
+        pane.setText(html);
+        pane.setCaretPosition(0);
+
         // 动态设置Tests按钮文本和颜色
         int testsTabIndex = 2;
         if (tabButtons.length > testsTabIndex) {
@@ -416,7 +447,10 @@ public class ResponsePanel extends JPanel {
     }
 
     public void clearAll() {
-        responseHeadersPanel.setHeaders(new LinkedHashMap<>());
+        ResponseHeadersPanel headersPanel = getResponseHeadersPanelIfLoaded();
+        if (headersPanel != null) {
+            headersPanel.setHeaders(new LinkedHashMap<>());
+        }
         if (protocol.isWebSocketProtocol()) {
             webSocketResponsePanel.clearMessages();
         }
@@ -425,19 +459,33 @@ public class ResponsePanel extends JPanel {
             sseResponsePanel.clearMessages();
         }
         if (protocol.isHttpProtocol()) {
-            responseBodyPanel.setBodyText(null);
-            timelinePanel.removeAll();
-            timelinePanel.revalidate();
-            timelinePanel.repaint();
-            networkLogPanel.clearLog();
-            networkLogPanel.clearAllDetails();
-            sseResponsePanel.clearMessages();
+            ResponseBodyPanel bodyPanel = getResponseBodyPanelIfLoaded();
+            if (bodyPanel != null) {
+                bodyPanel.setBodyText(null);
+            }
+            TimelinePanel panel = getTimelinePanelIfLoaded();
+            if (panel != null) {
+                panel.removeAll();
+                panel.revalidate();
+                panel.repaint();
+            }
+            NetworkLogPanel logPanel = getNetworkLogPanelIfLoaded();
+            if (logPanel != null) {
+                logPanel.clearLog();
+                logPanel.clearAllDetails();
+            }
+            SSEResponsePanel ssePanel = getSseResponsePanelIfLoaded();
+            if (ssePanel != null) {
+                ssePanel.clearMessages();
+            }
         }
 
-        if (testsPane != null) {
+        JEditorPane pane = getTestsPaneIfLoaded();
+        if (pane != null) {
             setTestResults(new ArrayList<>());
         }
     }
+
 
     /**
      * 切换Tab按钮，http或sse
@@ -453,6 +501,98 @@ public class ResponsePanel extends JPanel {
             tabButtons[5].doClick();
         }
     }
+
+    private void addHttpTab(String name, java.util.function.Supplier<JComponent> factory) {
+        responseTabFactories.add(factory);
+        cardPanel.add(createLoadingPanel(), name);
+    }
+
+    private JPanel createLoadingPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        JLabel label = new JLabel(I18nUtil.getMessage(MessageKeys.GENERAL_LOADING));
+        label.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
+        panel.add(label);
+        return panel;
+    }
+
+    private void ensureResponseTabLoaded(int index) {
+        if (!protocol.isHttpProtocol()) {
+            return;
+        }
+        if (index < 0 || index >= responseTabFactories.size() || loadedResponseTabs.contains(index)) {
+            return;
+        }
+        JComponent component = responseTabFactories.get(index).get();
+        cardPanel.add(component, tabNames[index]);
+        loadedResponseTabs.add(index);
+        CardLayout layout = (CardLayout) cardPanel.getLayout();
+        layout.show(cardPanel, tabNames[index]);
+    }
+
+    public ResponseBodyPanel getResponseBodyPanel() {
+        ensureResponseTabLoaded(HTTP_TAB_BODY);
+        return responseBodyPanel;
+    }
+
+    public ResponseHeadersPanel getResponseHeadersPanel() {
+        ensureResponseTabLoaded(HTTP_TAB_HEADERS);
+        return responseHeadersPanel;
+    }
+
+    private JEditorPane getTestsPane() {
+        ensureResponseTabLoaded(HTTP_TAB_TESTS);
+        return testsPane;
+    }
+
+    public NetworkLogPanel getNetworkLogPanel() {
+        ensureResponseTabLoaded(HTTP_TAB_NETWORK_LOG);
+        return networkLogPanel;
+    }
+
+    public TimelinePanel getTimelinePanel() {
+        ensureResponseTabLoaded(HTTP_TAB_TIMING);
+        return timelinePanel;
+    }
+
+    public SSEResponsePanel getSseResponsePanel() {
+        ensureResponseTabLoaded(HTTP_TAB_SSE_LOG);
+        return sseResponsePanel;
+    }
+
+    private ResponseHeadersPanel getResponseHeadersPanelIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_HEADERS) ? responseHeadersPanel : null;
+    }
+
+    private ResponseBodyPanel getResponseBodyPanelIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_BODY) ? responseBodyPanel : null;
+    }
+
+    private JEditorPane getTestsPaneIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_TESTS) ? testsPane : null;
+    }
+
+    private NetworkLogPanel getNetworkLogPanelIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_NETWORK_LOG) ? networkLogPanel : null;
+    }
+
+    private TimelinePanel getTimelinePanelIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_TIMING) ? timelinePanel : null;
+    }
+
+    private SSEResponsePanel getSseResponsePanelIfLoaded() {
+        return loadedResponseTabs.contains(HTTP_TAB_SSE_LOG) ? sseResponsePanel : null;
+    }
+
+    private JComponent createTestsPanel() {
+        JPanel testsPanel = new JPanel(new BorderLayout());
+        testsPane = new JEditorPane();
+        testsPane.setContentType("text/html");
+        testsPane.setEditable(false);
+        JScrollPane testsScrollPane = new JScrollPane(testsPane);
+        testsPanel.add(testsScrollPane, BorderLayout.CENTER);
+        return testsPanel;
+    }
+
 
     private String getSizeText(long bytes) {
         if (bytes < 1024) return bytes + " B";

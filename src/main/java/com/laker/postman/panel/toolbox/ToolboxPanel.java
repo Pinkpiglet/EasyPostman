@@ -9,6 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
+
 
 /**
  * 工具箱面板 - 包含开发常用工具
@@ -18,6 +24,9 @@ import java.awt.*;
 public class ToolboxPanel extends SingletonBasePanel {
 
     private JTabbedPane toolTabs;
+    private final List<Supplier<JPanel>> tabFactories = new ArrayList<>();
+    private final Set<Integer> loadedTabs = new HashSet<>();
+
 
     @Override
     protected void initUI() {
@@ -29,8 +38,11 @@ public class ToolboxPanel extends SingletonBasePanel {
 
         // 添加各种工具标签页 - 按功能分类和使用频率排序
         initToolTabs();
+        toolTabs.addChangeListener(e -> ensureTabLoaded(toolTabs.getSelectedIndex()));
+        ensureTabLoaded(0);
 
         add(toolTabs, BorderLayout.CENTER);
+
     }
 
     /**
@@ -38,60 +50,68 @@ public class ToolboxPanel extends SingletonBasePanel {
      */
     private void initToolTabs() {
         // 1. 数据格式化工具
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_JSON),
                 createThemedIcon("icons/format.svg"),
-                new JsonToolPanel()
+                JsonToolPanel::new
         );
+
 
         // 2. 编码解码工具
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_ENCODER),
                 createThemedIcon("icons/code.svg"),
-                new EncoderPanel()
+                EncoderPanel::new
         );
+
 
         // 3. 哈希计算工具（单向加密）
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_HASH),
                 createThemedIcon("icons/hash.svg"),
-                new HashPanel()
+                HashPanel::new
         );
+
 
         // 4. 加密解密工具（双向加密）
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_CRYPTO),
                 createThemedIcon("icons/security.svg"),
-                new CryptoPanel()
+                CryptoPanel::new
         );
+
 
         // 5. 时间戳转换工具
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_TIMESTAMP),
                 createThemedIcon("icons/time.svg"),
-                new TimestampPanel()
+                TimestampPanel::new
         );
+
 
         // 6. UUID生成器
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_UUID),
                 createThemedIcon("icons/plus.svg"),
-                new UuidPanel()
+                UuidPanel::new
         );
+
 
         // 7. 文本对比工具
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_DIFF),
                 createThemedIcon("icons/file.svg"),
-                new DiffPanel()
+                DiffPanel::new
         );
 
+
         // 8. Cron表达式工具
-        addToolTab(
+        addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_CRON),
                 createThemedIcon("icons/time.svg"),
-                new CronPanel()
+                CronPanel::new
         );
+
     }
 
     /**
@@ -110,13 +130,40 @@ public class ToolboxPanel extends SingletonBasePanel {
     /**
      * 添加工具标签页
      *
-     * @param title 标签页标题
-     * @param icon  标签页图标
-     * @param panel 标签页面板内容
+     * @param title   标签页标题
+     * @param icon    标签页图标
+     * @param factory 标签页面板工厂
      */
-    private void addToolTab(String title, Icon icon, JPanel panel) {
-        toolTabs.addTab(title, icon, panel);
+    private void addLazyToolTab(String title, Icon icon, Supplier<JPanel> factory) {
+        tabFactories.add(factory);
+        toolTabs.addTab(title, icon, createLoadingPanel());
     }
+
+    private JPanel createLoadingPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setOpaque(false);
+        JLabel label = new JLabel(I18nUtil.getMessage(MessageKeys.GENERAL_LOADING));
+        label.setForeground(ModernColors.getTextSecondary());
+        panel.add(label);
+        return panel;
+    }
+
+    private void ensureTabLoaded(int index) {
+        if (index < 0 || index >= tabFactories.size() || loadedTabs.contains(index)) {
+            return;
+        }
+        toolTabs.setComponentAt(index, createLoadingPanel());
+        SwingUtilities.invokeLater(() -> {
+            if (loadedTabs.contains(index)) {
+                return;
+            }
+            toolTabs.setComponentAt(index, tabFactories.get(index).get());
+            loadedTabs.add(index);
+            toolTabs.revalidate();
+            toolTabs.repaint();
+        });
+    }
+
 
     @Override
     protected void registerListeners() {

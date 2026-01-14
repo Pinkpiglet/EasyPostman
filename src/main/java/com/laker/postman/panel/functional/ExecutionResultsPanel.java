@@ -24,6 +24,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicLong;
+
 
 /**
  * 执行结果展示面板 - 类似 Postman 的 Runner Results
@@ -39,6 +41,10 @@ public class ExecutionResultsPanel extends JPanel {
     private transient BatchExecutionHistory executionHistory; // 当前执行历史记录
     private TreePath lastSelectedPath; // 保存最后选中的路径
     private int lastSelectedRequestDetailTabIndex = 0; // 记住用户在RequestDetail中选择的tab索引
+    private static final int HISTORY_REFRESH_INTERVAL_MS = 300;
+    private final AtomicLong lastRebuildTime = new AtomicLong(0L);
+    private Timer rebuildTimer;
+
 
     public ExecutionResultsPanel() {
         initUI();
@@ -280,13 +286,49 @@ public class ExecutionResultsPanel extends JPanel {
      * 更新执行历史数据
      */
     public void updateExecutionHistory(BatchExecutionHistory history) {
-        SwingUtilities.invokeLater(() -> {
+        Runnable update = () -> {
             this.executionHistory = history;
             // 重置tab索引为第一个，因为这是新的执行历史数据
             lastSelectedRequestDetailTabIndex = 0;
-            rebuildTree();
-        });
+            requestRebuild();
+        };
+        if (SwingUtilities.isEventDispatchThread()) {
+            update.run();
+        } else {
+            SwingUtilities.invokeLater(update);
+        }
     }
+
+    private void requestRebuild() {
+        long now = System.currentTimeMillis();
+        long lastTime = lastRebuildTime.get();
+        long elapsed = now - lastTime;
+
+        if (elapsed >= HISTORY_REFRESH_INTERVAL_MS) {
+            lastRebuildTime.set(now);
+            rebuildTree();
+            return;
+        }
+
+        int delay = (int) Math.max(0, HISTORY_REFRESH_INTERVAL_MS - elapsed);
+        if (rebuildTimer == null) {
+            rebuildTimer = new Timer(delay, e -> {
+                lastRebuildTime.set(System.currentTimeMillis());
+                rebuildTimer.stop();
+                rebuildTree();
+            });
+            rebuildTimer.setRepeats(false);
+            rebuildTimer.start();
+            return;
+        }
+
+        if (!rebuildTimer.isRunning()) {
+            rebuildTimer.setInitialDelay(delay);
+            rebuildTimer.setDelay(delay);
+            rebuildTimer.restart();
+        }
+    }
+
 
     private void rebuildTree() {
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
