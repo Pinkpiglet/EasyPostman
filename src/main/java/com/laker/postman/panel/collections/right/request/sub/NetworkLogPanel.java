@@ -30,6 +30,10 @@ public class NetworkLogPanel extends JPanel {
     private Timer logFlushTimer;
     private static final int LOG_FLUSH_INTERVAL_MS = 120;
 
+    private boolean logHasEntries;
+    private boolean fallbackAppended;
+    private PreparedRequest lastRequest;
+
     // 性能优化配置 - 降低限制防止卡顿
     private static final int MAX_LINE_LENGTH = 500; // 单行最大长度
     private static final int MAX_LINES_PER_MESSAGE = 30; // 单条消息最大行数
@@ -43,19 +47,18 @@ public class NetworkLogPanel extends JPanel {
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
 
-        // 1. Network Log Tab - 添加图标
+        // 1. Log Tab - 使用“日志”避免重复
         logArea = new JTextPane();
         logArea.setEditable(false);
         doc = logArea.getStyledDocument();
         JScrollPane logScroll = new JScrollPane(logArea);
 
-        // 创建带图标的标签
-        JLabel networkLogLabel = new JLabel(I18nUtil.getMessage(MessageKeys.TAB_NETWORK_LOG));
-        FlatSVGIcon networkLogIcon = new FlatSVGIcon("icons/console.svg", 14, 14);
-        networkLogIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("TabbedPane.foreground")));
-        networkLogLabel.setIcon(networkLogIcon);
+        JLabel logLabel = new JLabel(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
+        FlatSVGIcon logIcon = new FlatSVGIcon("icons/console.svg", 14, 14);
+        logIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("TabbedPane.foreground")));
+        logLabel.setIcon(logIcon);
         tabbedPane.addTab(null, logScroll);
-        tabbedPane.setTabComponentAt(0, networkLogLabel);
+        tabbedPane.setTabComponentAt(0, logLabel);
 
         // 2. Request Details Tab - 添加图标
         requestDetailsPane = createDetailPane();
@@ -198,18 +201,18 @@ public class NetworkLogPanel extends JPanel {
                 }
             }
             // 如果行数被截断，添加提示
-            if (lines.length > MAX_LINES_PER_MESSAGE) {
-                doc.insertString(doc.getLength(), "\n    ... [" + (lines.length - MAX_LINES_PER_MESSAGE) + " more lines omitted]", contentStyle);
+            if (lines.length > lineCount) {
+                doc.insertString(doc.getLength(), "\n    ... [" + (lines.length - lineCount) + " more lines truncated]", contentStyle);
             }
+
+            // 8. 添加换行
             doc.insertString(doc.getLength(), "\n", contentStyle);
 
-            // 自动滚动到底部
-            logArea.setCaretPosition(doc.getLength());
+            logHasEntries = true;
         } catch (BadLocationException e) {
             // ignore
         }
     }
-
 
     /**
      * 优化日志颜色，使用柔和的颜色方案
@@ -367,6 +370,8 @@ public class NetworkLogPanel extends JPanel {
             } catch (BadLocationException e) {
                 // ignore
             }
+            logHasEntries = false;
+            fallbackAppended = false;
         });
     }
 
@@ -375,6 +380,7 @@ public class NetworkLogPanel extends JPanel {
      */
     public void setRequestDetails(PreparedRequest request) {
         if (requestDetailsPane == null) return;
+        lastRequest = request;
         if (request == null) {
             requestDetailsPane.setText(I18nUtil.getMessage(MessageKeys.HISTORY_EMPTY_BODY));
             return;
@@ -396,6 +402,7 @@ public class NetworkLogPanel extends JPanel {
         String html = HttpHtmlRenderer.renderResponse(response);
         responseDetailsPane.setText(html);
         responseDetailsPane.setCaretPosition(0);
+        appendFallbackDetailsIfNeeded(response);
     }
 
     /**
@@ -407,6 +414,46 @@ public class NetworkLogPanel extends JPanel {
         }
         if (responseDetailsPane != null) {
             responseDetailsPane.setText("");
+        }
+    }
+
+    private void appendFallbackDetailsIfNeeded(HttpResponse response) {
+        if (logHasEntries || fallbackAppended) {
+            return;
+        }
+        fallbackAppended = true;
+        if (lastRequest != null && lastRequest.okHttpHeaders != null) {
+            StringBuilder headers = new StringBuilder();
+            for (int i = 0; i < lastRequest.okHttpHeaders.size(); i++) {
+                headers.append(lastRequest.okHttpHeaders.name(i)).append(": ")
+                        .append(lastRequest.okHttpHeaders.value(i)).append("\n");
+            }
+            if (headers.length() > 0) {
+                appendLog("[requestHeadersEnd]\n" + headers, new Color(33, 37, 41), false);
+            }
+            if (lastRequest.okHttpRequestBody != null && !lastRequest.okHttpRequestBody.isEmpty()) {
+                appendLog("[requestBodyEnd]\n" + lastRequest.okHttpRequestBody, new Color(33, 37, 41), false);
+            }
+        }
+        if (response != null) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Response Code: ").append(response.code).append("\n");
+            sb.append("Time: ").append(response.costMs).append(" ms\n");
+            sb.append("Size: ").append(response.bodySize).append(" B\n");
+            if (response.protocol != null) {
+                sb.append("Protocol: ").append(response.protocol).append("\n");
+            }
+            if (response.headers != null && !response.headers.isEmpty()) {
+                sb.append("Headers:\n");
+                response.headers.forEach((key, values) -> {
+                    String value = values != null ? String.join(", ", values) : "";
+                    sb.append(key).append(": ").append(value).append("\n");
+                });
+            }
+            appendLog("[responseHeadersEnd]\n" + sb, new Color(33, 37, 41), false);
+            if (response.body != null && !response.body.isEmpty()) {
+                appendLog("[responseBodyEnd]\n" + response.body, new Color(33, 37, 41), false);
+            }
         }
     }
 }

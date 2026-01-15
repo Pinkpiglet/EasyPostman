@@ -16,6 +16,7 @@ import java.util.Map;
 public class Environment {
     private String id;
     private String name;
+    private String baseUrl;
     private List<EnvironmentVariable> variableList = new ArrayList<>();
     private boolean active = false;
 
@@ -27,20 +28,22 @@ public class Environment {
     }
 
     public void addVariable(String key, String value) {
-        if (key != null && !key.isEmpty()) {
-            EnvironmentVariable variable = new EnvironmentVariable(true, key, value);
+        String normalizedKey = normalizeKey(key);
+        if (!normalizedKey.isEmpty()) {
+            EnvironmentVariable variable = new EnvironmentVariable(true, normalizedKey, value);
             variableList.add(variable);
         }
     }
 
 
     public void set(String key, String value) {
-        if (key != null && !key.isEmpty()) {
+        String normalizedKey = normalizeKey(key);
+        if (!normalizedKey.isEmpty()) {
             // 查找是否存在该key的变量
             boolean found = false;
             if (variableList != null) {
                 for (EnvironmentVariable envVar : variableList) {
-                    if (key.equals(envVar.getKey())) {
+                    if (normalizedKey.equals(normalizeKey(envVar.getKey()))) {
                         envVar.setValue(value);
                         envVar.setEnabled(true);
                         found = true;
@@ -53,7 +56,7 @@ public class Environment {
                 if (variableList == null) {
                     variableList = new ArrayList<>();
                 }
-                variableList.add(new EnvironmentVariable(true, key, value));
+                variableList.add(new EnvironmentVariable(true, normalizedKey, value));
             }
         }
     }
@@ -72,17 +75,19 @@ public class Environment {
     }
 
     public void removeVariable(String key) {
-        if (key != null && variableList != null) {
-            variableList.removeIf(envVar -> key.equals(envVar.getKey()));
+        String normalizedKey = normalizeKey(key);
+        if (!normalizedKey.isEmpty() && variableList != null) {
+            variableList.removeIf(envVar -> normalizedKey.equals(normalizeKey(envVar.getKey())));
         }
     }
 
 
     public String get(String key) {
+        String normalizedKey = normalizeKey(key);
         // 从 variableList 获取已启用的变量
-        if (variableList != null && !variableList.isEmpty()) {
+        if (!normalizedKey.isEmpty() && variableList != null && !variableList.isEmpty()) {
             for (EnvironmentVariable envVar : variableList) {
-                if (envVar.isEnabled() && key.equals(envVar.getKey())) {
+                if (envVar.isEnabled() && normalizedKey.equals(normalizeKey(envVar.getKey()))) {
                     return envVar.getValue();
                 }
             }
@@ -110,10 +115,11 @@ public class Environment {
 
     // for javascript
     public boolean hasVariable(String key) {
+        String normalizedKey = normalizeKey(key);
         // 从 variableList 查找已启用的变量
-        if (variableList != null && !variableList.isEmpty()) {
+        if (!normalizedKey.isEmpty() && variableList != null && !variableList.isEmpty()) {
             for (EnvironmentVariable envVar : variableList) {
-                if (envVar.isEnabled() && key.equals(envVar.getKey())) {
+                if (envVar.isEnabled() && normalizedKey.equals(normalizeKey(envVar.getKey()))) {
                     return true;
                 }
             }
@@ -138,10 +144,17 @@ public class Environment {
         if (variableList != null) {
             for (EnvironmentVariable envVar : variableList) {
                 if (envVar.isEnabled()) {
-                    result.put(envVar.getKey(), envVar.getValue());
+                    String normalizedKey = normalizeKey(envVar.getKey());
+                    if (!normalizedKey.isEmpty()) {
+                        result.put(normalizedKey, envVar.getValue());
+                    }
                 }
             }
         }
         return result;
+    }
+
+    private String normalizeKey(String key) {
+        return key == null ? "" : key.trim();
     }
 }

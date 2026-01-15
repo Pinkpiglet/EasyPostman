@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 
 public class ThreadGroupPropertyPanel extends JPanel {
+    private static final Dimension SPINNER_SIZE = new Dimension(96, 28);
+
     private final JComboBox<ThreadGroupData.ThreadMode> modeComboBox;
     private final CardLayout cardLayout;
     private final JPanel cardPanel;
@@ -71,7 +73,7 @@ public class ThreadGroupPropertyPanel extends JPanel {
         cardLayout = new CardLayout();
         cardPanel = new JPanel(cardLayout);
         // 动态调整配置面板大小以适应不同语言的标签长度
-        int configPanelWidth = I18nUtil.isChinese() ? 380 : 480;  // 英文需要更多空间
+        int configPanelWidth = I18nUtil.isChinese() ? 420 : 520;  // 英文需要更多空间
         cardPanel.setPreferredSize(new Dimension(configPanelWidth, 150));
 
         // 初始化所有控件和面板
@@ -79,54 +81,54 @@ public class ThreadGroupPropertyPanel extends JPanel {
         fixedPanel = new JPanel(new GridBagLayout());
         fixedPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         fixedNumThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
-        fixedNumThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        fixedNumThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         fixedLoopsSpinner = new EasyJSpinner(new SpinnerNumberModel(1, 1, 100000, 1));
-        fixedLoopsSpinner.setPreferredSize(new Dimension(80, 28));
+        fixedLoopsSpinner.setPreferredSize(SPINNER_SIZE);
         useTimeCheckBox = new JCheckBox(I18nUtil.getMessage(MessageKeys.THREADGROUP_FIXED_USE_TIME));
         durationSpinner = new EasyJSpinner(new SpinnerNumberModel(60, 1, 86400, 10));
-        durationSpinner.setPreferredSize(new Dimension(80, 28));
+        durationSpinner.setPreferredSize(SPINNER_SIZE);
 
         // 2. 递增模式面板
         rampUpPanel = new JPanel(new GridBagLayout());
         rampUpPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         rampUpStartThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
-        rampUpStartThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        rampUpStartThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         rampUpEndThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(10, 1, 1000, 1));
-        rampUpEndThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        rampUpEndThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         rampUpTimeSpinner = new EasyJSpinner(new SpinnerNumberModel(30, 1, 3600, 5));
-        rampUpTimeSpinner.setPreferredSize(new Dimension(80, 28));
+        rampUpTimeSpinner.setPreferredSize(SPINNER_SIZE);
         rampUpDurationSpinner = new EasyJSpinner(new SpinnerNumberModel(120, 1, 86400, 10));
-        rampUpDurationSpinner.setPreferredSize(new Dimension(80, 28));
+        rampUpDurationSpinner.setPreferredSize(SPINNER_SIZE);
 
         // 3. 尖刺模式面板
         spikePanel = new JPanel(new GridBagLayout());
         spikePanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         spikeMinThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
-        spikeMinThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeMinThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         spikeMaxThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(20, 1, 1000, 1));
-        spikeMaxThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeMaxThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         spikeRampUpTimeSpinner = new EasyJSpinner(new SpinnerNumberModel(10, 1, 3600, 1));
-        spikeRampUpTimeSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeRampUpTimeSpinner.setPreferredSize(SPINNER_SIZE);
         spikeHoldTimeSpinner = new EasyJSpinner(new SpinnerNumberModel(5, 0, 3600, 1));
-        spikeHoldTimeSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeHoldTimeSpinner.setPreferredSize(SPINNER_SIZE);
         spikeRampDownTimeSpinner = new EasyJSpinner(new SpinnerNumberModel(10, 1, 3600, 1));
-        spikeRampDownTimeSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeRampDownTimeSpinner.setPreferredSize(SPINNER_SIZE);
         spikeDurationSpinner = new EasyJSpinner(new SpinnerNumberModel(120, 1, 86400, 10));
-        spikeDurationSpinner.setPreferredSize(new Dimension(80, 28));
+        spikeDurationSpinner.setPreferredSize(SPINNER_SIZE);
 
         // 4. 阶梯模式面板
         stairsPanel = new JPanel(new GridBagLayout());
         stairsPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         stairsStartThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
-        stairsStartThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        stairsStartThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         stairsEndThreadsSpinner = new EasyJSpinner(new SpinnerNumberModel(20, 1, 1000, 1));
-        stairsEndThreadsSpinner.setPreferredSize(new Dimension(80, 28));
+        stairsEndThreadsSpinner.setPreferredSize(SPINNER_SIZE);
         stairsStepSpinner = new EasyJSpinner(new SpinnerNumberModel(5, 1, 100, 1));
-        stairsStepSpinner.setPreferredSize(new Dimension(80, 28));
+        stairsStepSpinner.setPreferredSize(SPINNER_SIZE);
         stairsHoldTimeSpinner = new EasyJSpinner(new SpinnerNumberModel(10, 1, 3600, 1));
-        stairsHoldTimeSpinner.setPreferredSize(new Dimension(80, 28));
+        stairsHoldTimeSpinner.setPreferredSize(SPINNER_SIZE);
         stairsDurationSpinner = new EasyJSpinner(new SpinnerNumberModel(240, 1, 86400, 10));
-        stairsDurationSpinner.setPreferredSize(new Dimension(80, 28));
+        stairsDurationSpinner.setPreferredSize(SPINNER_SIZE);
 
         // 设置各个面板的布局
         setupFixedPanel();

@@ -104,8 +104,14 @@ public class ToolboxPanel extends SingletonBasePanel {
                 DiffPanel::new
         );
 
+        // 8. 虚拟个人信息生成
+        addLazyToolTab(
+                I18nUtil.getMessage(MessageKeys.TOOLBOX_PROFILE),
+                createThemedIcon("icons/users.svg"),
+                FakeProfilePanel::new
+        );
 
-        // 8. Cron表达式工具
+        // 9. Cron表达式工具
         addLazyToolTab(
                 I18nUtil.getMessage(MessageKeys.TOOLBOX_CRON),
                 createThemedIcon("icons/time.svg"),

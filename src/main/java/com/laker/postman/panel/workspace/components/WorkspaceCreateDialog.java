@@ -6,6 +6,7 @@ import com.laker.postman.model.GitAuthType;
 import com.laker.postman.model.GitRepoSource;
 import com.laker.postman.model.Workspace;
 import com.laker.postman.model.WorkspaceType;
+import com.laker.postman.service.EnvironmentService;
 import com.laker.postman.service.WorkspaceService;
 import com.laker.postman.util.*;
 import lombok.Getter;
@@ -33,12 +34,15 @@ public class WorkspaceCreateDialog extends ProgressDialog {
     @Getter
     private transient Workspace workspace;
 
+    private String environmentBaseUrl;
+
     // UI组件
     private JTextField nameField;
     private JTextArea descriptionArea;
     private JRadioButton localTypeRadio;
     private JRadioButton gitTypeRadio;
     private JTextField pathField;
+    private JTextField environmentUrlField;
     private JButton browseButton;
     private JCheckBox autoGeneratePathCheckBox;
 
@@ -77,6 +81,8 @@ public class WorkspaceCreateDialog extends ProgressDialog {
         pathField = new JTextField(15);
         setDefaultWorkspacePath(); // 设置默认路径
 
+        environmentUrlField = new JTextField(15);
+
         browseButton = new JButton(I18nUtil.getMessage(MessageKeys.WORKSPACE_SELECT_PATH));
         browseButton.setIcon(IconUtil.createThemed("icons/file.svg", 16, 16));
 
@@ -107,6 +113,7 @@ public class WorkspaceCreateDialog extends ProgressDialog {
         nameField.setFont(defaultFont);
         descriptionArea.setFont(defaultFont);
         pathField.setFont(defaultFont);
+        environmentUrlField.setFont(defaultFont);
         gitUrlField.setFont(defaultFont);
         branchField.setFont(defaultFont);
     }
@@ -185,7 +192,7 @@ public class WorkspaceCreateDialog extends ProgressDialog {
         add(containerPanel, BorderLayout.CENTER);
 
         // 设置对话框的初始大小
-        setPreferredSize(new Dimension(550, 520));
+        setPreferredSize(new Dimension(550, 560));
     }
 
     @Override
@@ -292,9 +299,22 @@ public class WorkspaceCreateDialog extends ProgressDialog {
         gbc.weightx = 1.0;
         panel.add(new JScrollPane(descriptionArea), gbc);
 
-        // 工作区类型
+        // 环境地址
         gbc.gridx = 0;
         gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0;
+        panel.add(new JLabel(I18nUtil.getMessage(MessageKeys.WORKSPACE_ENVIRONMENT_URL) + ":"), gbc);
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        panel.add(environmentUrlField, gbc);
+
+        // 工作区类型
+        gbc.gridx = 0;
+        gbc.gridy = 3;
         gbc.gridwidth = 1;
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
@@ -306,14 +326,14 @@ public class WorkspaceCreateDialog extends ProgressDialog {
 
         // 自动生成路径选项
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 4;
         gbc.gridwidth = 3;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(autoGeneratePathCheckBox, gbc);
 
         // 本地路径
         gbc.gridx = 0;
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         gbc.gridwidth = 1;
         gbc.fill = GridBagConstraints.NONE;
         panel.add(new JLabel(I18nUtil.getMessage(MessageKeys.WORKSPACE_PATH) + ":"), gbc);
@@ -386,9 +406,9 @@ public class WorkspaceCreateDialog extends ProgressDialog {
 
         // 调整对话框大小以适应内容
         if (isGit) {
-            setPreferredSize(new Dimension(550, 680));
+            setPreferredSize(new Dimension(550, 720));
         } else {
-            setPreferredSize(new Dimension(550, 420));
+            setPreferredSize(new Dimension(550, 480));
         }
 
         pack();
@@ -496,6 +516,7 @@ public class WorkspaceCreateDialog extends ProgressDialog {
                 try {
                     // 使用 WorkspaceService 创建工作区，它会处理所有的 Git 操作
                     WorkspaceService.getInstance().createWorkspace(workspace);
+                    EnvironmentService.updateWorkspaceBaseUrl(SystemUtil.getEnvPathForWorkspace(workspace), environmentBaseUrl);
                     publish(I18nUtil.getMessage(MessageKeys.WORKSPACE_CREATE_DIALOG_CREATION_COMPLETED));
                     setProgress(100);
                 } catch (Exception e) {
@@ -526,6 +547,7 @@ public class WorkspaceCreateDialog extends ProgressDialog {
     protected void setInputComponentsEnabled(boolean enabled) {
         nameField.setEnabled(enabled);
         descriptionArea.setEnabled(enabled);
+        environmentUrlField.setEnabled(enabled);
         localTypeRadio.setEnabled(enabled);
         gitTypeRadio.setEnabled(enabled);
         autoGeneratePathCheckBox.setEnabled(enabled);
@@ -554,6 +576,7 @@ public class WorkspaceCreateDialog extends ProgressDialog {
         ws.setName(nameField.getText().trim());
         ws.setDescription(descriptionArea.getText().trim());
         ws.setPath(pathField.getText().trim());
+        environmentBaseUrl = environmentUrlField.getText().trim();
 
         if (localTypeRadio.isSelected()) {
             ws.setType(WorkspaceType.LOCAL);

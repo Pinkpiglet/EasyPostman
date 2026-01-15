@@ -3,7 +3,10 @@ package com.laker.postman.common;
 import com.laker.postman.common.exception.GetInstanceException;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -93,5 +96,30 @@ public class SingletonFactory {
 
             throw new GetInstanceException("创建单例失败: " + clazz.getName(), e);
         }
+    }
+
+    /**
+     * 清理所有已缓存的单例实例（用于语言/主题切换时全量刷新 UI）
+     */
+    public static void clearAllInstances() {
+        INSTANCE_MAP.clear();
+    }
+
+    /**
+     * 注册/覆盖单例实例（用于保持 MainFrame 等常驻实例）
+     */
+    public static void registerInstance(Class<?> clazz, Object instance) {
+        if (clazz == null || instance == null) {
+            throw new IllegalArgumentException("Class and instance must not be null");
+        }
+        INSTANCE_MAP.put(clazz, instance);
+    }
+
+    /**
+     * 清理单例实例，但保留指定类型
+     */
+    public static void clearInstancesExcept(Class<?>... keepClasses) {
+        Set<Class<?>> keepSet = new HashSet<>(Arrays.asList(keepClasses));
+        INSTANCE_MAP.keySet().removeIf(key -> !keepSet.contains(key));
     }
 }

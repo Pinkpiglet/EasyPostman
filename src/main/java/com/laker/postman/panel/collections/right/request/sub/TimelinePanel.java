@@ -355,19 +355,25 @@ public class TimelinePanel extends JPanel {
                 g2.setPaint(gp);
                 g2.fillRoundRect(currentX, barY, barW, BAR_HEIGHT, BAR_RADIUS, BAR_RADIUS);
             }
-            // 耗时始终在bar内右侧，bar太窄则不显示
-            String ms = (s.end - s.start) + "ms";
+            // 耗时在bar内显示，过窄时绘制在bar右侧
+            long duration = Math.max(0, s.end - s.start);
+            String ms = duration + "ms";
             g2.setFont(FontsUtil.getDefaultFont(Font.PLAIN)); // 使用用户设置的字体大小;
             int strW = g2.getFontMetrics().stringWidth(ms);
+            int extraDescOffset = 0;
             if (barW > strW + 8) {
                 g2.setColor(Color.WHITE);
                 g2.drawString(ms, currentX + barW - strW - 6, barY + textYOffset);
+            } else {
+                g2.setColor(getDescTextColor());
+                g2.drawString(ms, currentX + barW + 6, barY + textYOffset);
+                extraDescOffset = strW + 8;
             }
             // desc 区域
             if (s.desc != null && !s.desc.isEmpty()) {
                 g2.setFont(FontsUtil.getDefaultFont(Font.PLAIN)); // 使用用户设置的字体大小;
                 g2.setColor(getDescTextColor());
-                int descX = currentX + barW + DESC_LEFT_PAD;
+                int descX = currentX + barW + DESC_LEFT_PAD + extraDescOffset;
                 int maxDescW = panelW - descX - RIGHT_PAD;
                 String desc = s.desc;
                 int descW = g2.getFontMetrics().stringWidth(desc);

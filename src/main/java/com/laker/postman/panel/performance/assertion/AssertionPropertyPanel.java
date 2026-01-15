@@ -1,6 +1,8 @@
 package com.laker.postman.panel.performance.assertion;
 
 import com.laker.postman.panel.performance.model.JMeterTreeNode;
+import com.laker.postman.util.I18nUtil;
+import com.laker.postman.util.MessageKeys;
 
 import javax.swing.*;
 import java.awt.*;
@@ -31,7 +33,7 @@ public class AssertionPropertyPanel extends JPanel {
         gbc.gridy = 0;
         gbc.gridwidth = 1;
         gbc.anchor = GridBagConstraints.CENTER;
-        add(new JLabel("断言类型:"), gbc);
+        add(new JLabel(I18nUtil.getMessage(MessageKeys.ASSERTION_TYPE_LABEL)), gbc);
         gbc.gridx = 1;
         gbc.anchor = GridBagConstraints.CENTER;
         typeCombo = new JComboBox<>(new String[]{
@@ -112,7 +114,7 @@ public class AssertionPropertyPanel extends JPanel {
         gbc.gridx = 0;
         gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
-        JLabel helpLabel = new JLabel("<html>\n<ul style='margin-left:10px'>\n<li><b>Response Code</b>: 断言响应码，支持 <b>=</b>、<b>></b>、<b><</b>，如 <code>=200</code> 表示响应码等于200</li>\n<li><b>Response Time</b>: 断言响应耗时（毫秒），如 <code><500</code> 表示响应时间小于500ms</li>\n<li><b>Contains</b>: 断言响应体包含指定内容，输入要查找的字符串即可</li>\n<li><b>JSONPath</b>: 断言响应体通过 JSONPath 表达式提取的值等于对比值，支持如 <code>$.data[0].id</code> 语法</li>\n</ul>\n</html>");
+        JLabel helpLabel = new JLabel(I18nUtil.getMessage(MessageKeys.TOOLTIP_ASSERTION_HELP_HTML));
 
         helpLabel.setFont(helpLabel.getFont().deriveFont(Font.PLAIN, 12f));
         add(helpLabel, gbc);
@@ -125,9 +127,9 @@ public class AssertionPropertyPanel extends JPanel {
         String type = (String) typeCombo.getSelectedItem();
         inputCardLayout.show(inputPanel, type);
         if ("Response Time".equals(type)) {
-            responseCodeValueField.setToolTipText("响应耗时（ms）");
+            responseCodeValueField.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_ASSERTION_RESPONSE_TIME));
         } else if ("Response Code".equals(type)) {
-            responseCodeValueField.setToolTipText("响应码");
+            responseCodeValueField.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_ASSERTION_RESPONSE_CODE));
         } else {
             responseCodeValueField.setToolTipText(null);
         }

@@ -5,6 +5,9 @@ import com.laker.postman.common.SingletonBasePanel;
 import com.laker.postman.common.constants.ModernColors;
 import com.laker.postman.panel.collections.left.RequestCollectionsLeftPanel;
 import com.laker.postman.panel.collections.right.RequestEditPanel;
+import com.laker.postman.util.FontsUtil;
+import com.laker.postman.util.I18nUtil;
+import com.laker.postman.util.MessageKeys;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
@@ -17,21 +20,48 @@ import java.awt.*;
 public class RequestCollectionsPanel extends SingletonBasePanel {
     @Override
     protected void initUI() {
-        // 设置布局为 BorderLayout
-        setLayout(new BorderLayout()); // 设置布局为 BorderLayout
-        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, ModernColors.getDividerBorderColor()));
-        // 1.创建左侧的请求集合面板
-        RequestCollectionsLeftPanel requestCollectionsLeftPanel = SingletonFactory.getInstance(RequestCollectionsLeftPanel.class);
-        // 2. 创建右侧的请求编辑面板
-        RequestEditPanel rightRequestEditPanel = SingletonFactory.getInstance(RequestEditPanel.class); // 创建请求编辑面板实例
-        // 创建水平分割面板，将左侧的集合面板和右侧的请求编辑面板放入其中
-        JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, requestCollectionsLeftPanel, rightRequestEditPanel);
-        mainSplit.setContinuousLayout(true); // 分割条拖动时实时更新布局
-        mainSplit.setDividerLocation(250); // 设置初始分割位置
-        mainSplit.setDividerSize(2); // 设置分割条的宽度
+        setLayout(new BorderLayout());
 
-        // 将分割面板添加到主面板
-        add(mainSplit, BorderLayout.CENTER); // 将分割面板添加到主面板的中心位置
+        add(createHeaderPanel(), BorderLayout.NORTH);
+
+        JPanel content = new JPanel(new BorderLayout());
+        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+
+        RequestCollectionsLeftPanel requestCollectionsLeftPanel = SingletonFactory.getInstance(RequestCollectionsLeftPanel.class);
+        RequestEditPanel rightRequestEditPanel = SingletonFactory.getInstance(RequestEditPanel.class);
+        JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, requestCollectionsLeftPanel, rightRequestEditPanel);
+        mainSplit.setContinuousLayout(true);
+        mainSplit.setDividerLocation(260);
+        mainSplit.setDividerSize(4);
+
+        content.add(createCardPanel(mainSplit), BorderLayout.CENTER);
+        add(content, BorderLayout.CENTER);
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ModernColors.getDividerBorderColor()));
+        header.setBackground(UIManager.getColor("Panel.background"));
+
+        JLabel title = new JLabel(I18nUtil.getMessage(MessageKeys.MENU_COLLECTIONS));
+        title.setFont(FontsUtil.getDefaultFont(Font.BOLD));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        left.setOpaque(false);
+        left.add(title);
+
+        header.add(left, BorderLayout.WEST);
+        return header;
+    }
+
+    private JPanel createCardPanel(JComponent content) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ModernColors.getDividerBorderColor()),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+        panel.add(content, BorderLayout.CENTER);
+        return panel;
     }
 
     @Override

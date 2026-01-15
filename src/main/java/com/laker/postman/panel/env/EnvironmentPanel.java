@@ -55,6 +55,8 @@ public class EnvironmentPanel extends SingletonBasePanel {
     private DefaultListModel<EnvironmentItem> environmentListModel;
     private JTextField searchField;
     private ImportButton importBtn;
+    private JTextField baseUrlField;
+    private javax.swing.Timer baseUrlDebounceTimer;
     private String originalVariablesSnapshot; // 原始变量快照，直接用json字符串
     private boolean isLoadingData = false; // 用于控制是否正在加载数据，防止自动保存
     private String lastRefreshDataFilePath;
@@ -62,6 +64,7 @@ public class EnvironmentPanel extends SingletonBasePanel {
     private int lastEnvironmentCount = -1;
     private javax.swing.Timer searchDebounceTimer;
     private static final int SEARCH_DEBOUNCE_MS = 250;
+    private static final int BASE_URL_DEBOUNCE_MS = 300;
     private String pendingSearchText = "";
 
 
@@ -92,6 +95,10 @@ public class EnvironmentPanel extends SingletonBasePanel {
 
         // 右侧 导入 导出 变量表格及操作
         JPanel rightPanel = new JPanel(new BorderLayout());
+
+        JPanel baseUrlPanel = createBaseUrlPanel();
+        rightPanel.add(baseUrlPanel, BorderLayout.NORTH);
+
         // 变量表格
         variablesTablePanel = new EasyPostmanEnvironmentTablePanel();
         rightPanel.add(variablesTablePanel, BorderLayout.CENTER);
@@ -100,6 +107,7 @@ public class EnvironmentPanel extends SingletonBasePanel {
 
         // 初始化表格验证和自动保存功能
         initTableValidationAndAutoSave();
+        initBaseUrlListener();
     }
 
     /**
@@ -128,6 +136,64 @@ public class EnvironmentPanel extends SingletonBasePanel {
         });
     }
 
+    private JPanel createBaseUrlPanel() {
+        JPanel panel = new JPanel(new BorderLayout(8, 0));
+        panel.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+
+        JLabel label = new JLabel(I18nUtil.getMessage(MessageKeys.ENV_BASE_URL));
+        label.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
+
+        baseUrlField = new JTextField();
+        baseUrlField.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
+
+        panel.add(label, BorderLayout.WEST);
+        panel.add(baseUrlField, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void initBaseUrlListener() {
+        baseUrlDebounceTimer = new javax.swing.Timer(BASE_URL_DEBOUNCE_MS, e -> saveBaseUrlIfNeeded());
+        baseUrlDebounceTimer.setRepeats(false);
+
+        baseUrlField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                scheduleBaseUrlSave();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                scheduleBaseUrlSave();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                scheduleBaseUrlSave();
+            }
+        });
+
+        baseUrlField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                saveBaseUrlIfNeeded();
+            }
+        });
+    }
+
+    private void scheduleBaseUrlSave() {
+        if (isLoadingData) {
+            return;
+        }
+        baseUrlDebounceTimer.restart();
+    }
+
+    private void saveBaseUrlIfNeeded() {
+        if (isLoadingData || currentEnvironment == null) {
+            return;
+        }
+        autoSaveVariables();
+    }
+
     /**
      * 自动保存变量（静默保存，无提示）
      * 类似 Postman 的即时保存体验
@@ -136,12 +202,7 @@ public class EnvironmentPanel extends SingletonBasePanel {
         if (currentEnvironment == null) return;
 
         try {
-            variablesTablePanel.stopCellEditing();
-            List<EnvironmentVariable> variableList = variablesTablePanel.getVariableList();
-            currentEnvironment.setVariableList(new ArrayList<>(variableList)); // 使用副本避免并发修改
-            EnvironmentService.saveEnvironment(currentEnvironment);
-            // 保存后更新快照
-            originalVariablesSnapshot = JSONUtil.toJsonStr(currentEnvironment.getVariableList());
+            saveVariables();
             log.debug("Auto-saved environment: {}", currentEnvironment.getName());
         } catch (Exception ex) {
             log.error("Failed to auto-save environment variables", ex);
@@ -151,6 +212,9 @@ public class EnvironmentPanel extends SingletonBasePanel {
     private JPanel getSearchAndImportPanel() {
         JPanel importExportPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         importExportPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        importExportPanel.setOpaque(true);
+        importExportPanel.setBackground(UIManager.getColor("Panel.background"));
+        importExportPanel.setPreferredSize(new Dimension(0, 36));
 
         importBtn = new ImportButton();
         importBtn.addActionListener(e -> showImportMenu());
@@ -217,6 +281,11 @@ public class EnvironmentPanel extends SingletonBasePanel {
                     return; // 没有切换环境，不处理
                 }
                 currentEnvironment = item.getEnvironment();
+                EnvironmentService.setActiveEnvironment(currentEnvironment.getId());
+                EnvironmentComboBox comboBox = SingletonFactory.getInstance(TopMenuBar.class).getEnvironmentComboBox();
+                if (comboBox != null) {
+                    comboBox.setSelectedEnvironment(currentEnvironment);
+                }
                 loadVariables(currentEnvironment);
             }
         });
@@ -404,9 +473,11 @@ public class EnvironmentPanel extends SingletonBasePanel {
             variablesTablePanel.clear();
 
             if (env != null) {
+                baseUrlField.setText(env.getBaseUrl() == null ? "" : env.getBaseUrl());
                 variablesTablePanel.setVariableList(env.getVariableList());
-                originalVariablesSnapshot = JSONUtil.toJsonStr(env.getVariableList()); // 用rows做快照，保证同步
+                originalVariablesSnapshot = JSONUtil.toJsonStr(variablesTablePanel.getVariableList());
             } else {
+                baseUrlField.setText("");
                 variablesTablePanel.clear();
                 originalVariablesSnapshot = JSONUtil.toJsonStr(new ArrayList<>()); // 空快照
             }
@@ -424,12 +495,15 @@ public class EnvironmentPanel extends SingletonBasePanel {
         if (currentEnvironment == null) return;
         variablesTablePanel.stopCellEditing();
 
+        List<EnvironmentVariable> tableVariables = variablesTablePanel.getVariableList();
+        currentEnvironment.setBaseUrl(baseUrlField.getText() == null ? "" : baseUrlField.getText().trim());
+
         // 保存到新格式 variableList
-        List<EnvironmentVariable> variableList = variablesTablePanel.getVariableList();
-        currentEnvironment.setVariableList(new ArrayList<>(variableList)); // 使用副本避免并发修改
+        currentEnvironment.setVariableList(new ArrayList<>(tableVariables)); // 使用副本避免并发修改
         EnvironmentService.saveEnvironment(currentEnvironment);
+
         // 保存后更新快照为json字符串
-        originalVariablesSnapshot = JSONUtil.toJsonStr(currentEnvironment.getVariableList());
+        originalVariablesSnapshot = JSONUtil.toJsonStr(variablesTablePanel.getVariableList());
     }
 
     /**
@@ -445,6 +519,7 @@ public class EnvironmentPanel extends SingletonBasePanel {
         // 显示保存成功通知（只有手动保存才显示，自动保存不打扰用户）
         NotificationUtil.showSuccess(I18nUtil.getMessage(MessageKeys.ENV_DIALOG_SAVE_SUCCESS));
     }
+
 
     /**
      * 导出所有环境变量为JSON文件

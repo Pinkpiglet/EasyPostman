@@ -26,12 +26,15 @@ import com.laker.postman.panel.performance.model.ResultNodeInfo;
 import com.laker.postman.panel.performance.result.PerformanceReportPanel;
 import com.laker.postman.panel.performance.result.PerformanceResultTablePanel;
 import com.laker.postman.panel.performance.result.PerformanceTrendPanel;
+import com.laker.postman.panel.performance.timer.TimerPropertyPanel;
 import com.laker.postman.panel.performance.threadgroup.ThreadGroupData;
 import com.laker.postman.panel.performance.threadgroup.ThreadGroupPropertyPanel;
-import com.laker.postman.panel.performance.timer.TimerPropertyPanel;
-import com.laker.postman.service.EnvironmentService;
+import com.laker.postman.performance.stats.PerformanceReportSnapshot;
+import com.laker.postman.performance.stats.PerformanceStatistics;
+import com.laker.postman.performance.stats.PerformanceTrendSnapshot;
 import com.laker.postman.service.PerformancePersistenceService;
 import com.laker.postman.service.collections.RequestCollectionsService;
+import com.laker.postman.service.EnvironmentService;
 import com.laker.postman.service.http.HttpSingleRequestExecutor;
 import com.laker.postman.service.http.PreparedRequestBuilder;
 import com.laker.postman.service.http.okhttp.OkHttpClientManager;
@@ -52,8 +55,7 @@ import javax.swing.tree.TreeSelectionModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+
 import java.util.*;
 import java.util.List;
 import java.util.function.Supplier;
@@ -92,17 +94,8 @@ public class PerformancePanel extends SingletonBasePanel {
     private JCheckBox efficientCheckBox; // 高效模式复选框
     private JLabel progressLabel; // 进度标签
     private long startTime;
-    // 记录所有请求的开始和结束时间
-    private final List<Long> allRequestStartTimes = Collections.synchronizedList(new ArrayList<>());
-
-
-    private final transient List<RequestResult> allRequestResults = Collections.synchronizedList(new ArrayList<>());
+    private final PerformanceStatistics statistics = new PerformanceStatistics();
     private final Map<DefaultMutableTreeNode, List<DefaultMutableTreeNode>> cachedRequestNodes = new ConcurrentHashMap<>();
-
-    // 按接口统计
-    private final Map<String, List<Long>> apiCostMap = new ConcurrentHashMap<>();
-    private final Map<String, Integer> apiSuccessMap = new ConcurrentHashMap<>();
-    private final Map<String, Integer> apiFailMap = new ConcurrentHashMap<>();
     private int lastReportResultCount = 0;
 
     // 活跃线程计数器
@@ -110,11 +103,6 @@ public class PerformancePanel extends SingletonBasePanel {
     private static final long PROGRESS_UPDATE_INTERVAL_MS = 200L;
     private final AtomicLong lastProgressUpdate = new AtomicLong(0L);
     private final AtomicReference<String> lastProgressText = new AtomicReference<>("");
-
-
-    // 统计数据保护锁
-
-    private final transient Object statsLock = new Object();
 
     // 定时采样线程
     private transient Timer trendTimer;
@@ -152,7 +140,6 @@ public class PerformancePanel extends SingletonBasePanel {
     @Override
     protected void initUI() {
         setLayout(new BorderLayout());
-        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, ModernColors.getDividerBorderColor()));
 
         // 初始化持久化服务
         this.persistenceService = SingletonFactory.getInstance(PerformancePersistenceService.class);
@@ -224,81 +211,12 @@ public class PerformancePanel extends SingletonBasePanel {
         verticalSplit.setDividerSize(6);
         verticalSplit.setContinuousLayout(true);
 
-        add(verticalSplit, BorderLayout.CENTER);
+        add(createHeaderPanel(), BorderLayout.NORTH);
 
-
-        // 保存/加载用例按钮 ==========
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ModernColors.getDividerBorderColor()));
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 5));
-        runBtn = new StartButton();
-        stopBtn = new StopButton();
-        stopBtn.setEnabled(false);
-        btnPanel.add(runBtn);
-        btnPanel.add(stopBtn);
-
-        // 刷新按钮
-        refreshBtn = new RefreshButton();
-        refreshBtn.addActionListener(e -> refreshRequestsFromCollections());
-        btnPanel.add(refreshBtn);
-
-        // 高效模式checkbox - 更醒目的样式和更好的交互
-        efficientCheckBox = new JCheckBox(I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE));
-        efficientCheckBox.setSelected(efficientMode); // 使用加载的高效模式设置
-        // 设置为粗体并增大字体
-        efficientCheckBox.setFont(FontsUtil.getDefaultFont(Font.BOLD));
-        // 设置醒目的前景色
-        efficientCheckBox.setForeground(new Color(0, 128, 0)); // 深绿色表示推荐
-
-        // 创建多行HTML格式的详细提示
-        String htmlTooltip = "<html><body style='width: 400px; padding: 10px;'>" +
-                "<b style='color: #008000; font-size: 13px;'>" + I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE) + "</b><br><br>" +
-                I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_TOOLTIP_HTML) +
-                "</body></html>";
-        efficientCheckBox.setToolTipText(htmlTooltip);
-
-
-        efficientCheckBox.addActionListener(e -> {
-            // 如果用户尝试关闭高效模式，给出强烈警告
-            if (!efficientCheckBox.isSelected()) {
-                // 显示警告对话框，让用户确认是否真的要关闭
-                int result = JOptionPane.showConfirmDialog(PerformancePanel.this,
-                        I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_DISABLE_WARNING),
-                        I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_WARNING_TITLE),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.WARNING_MESSAGE);
-
-                // 如果用户选择NO（不关闭），则保持开启状态
-                if (result != JOptionPane.YES_OPTION) {
-                    efficientCheckBox.setSelected(true);
-                    return;
-                }
-                // 如果用户坚持要关闭，则允许但更新状态
-            }
-            efficientMode = efficientCheckBox.isSelected();
-            // 保存高效模式设置
-            saveAllPropertyPanelData();
-        });
-        btnPanel.add(efficientCheckBox);
-        csvDataPanel = new CsvDataPanel();
-        btnPanel.add(csvDataPanel);
-        topPanel.add(btnPanel, BorderLayout.WEST);
-        // ========== 执行进度指示器 ==========
-        JPanel progressPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 5));
-        progressLabel = new JLabel();
-        progressLabel.setText("0/0");
-        progressLabel.setFont(progressLabel.getFont().deriveFont(Font.BOLD)); // 设置粗体
-        progressLabel.setIcon(new FlatSVGIcon("icons/users.svg", 20, 20)
-                .setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")))); // 使用FlatLaf SVG图标
-        progressLabel.setHorizontalTextPosition(SwingConstants.RIGHT);
-        progressPanel.setToolTipText(I18nUtil.getMessage(MessageKeys.PERFORMANCE_PROGRESS_TOOLTIP));
-        progressPanel.add(progressLabel);
-        // ========== 内存占用显示 ==========
-        MemoryLabel memoryLabel = new MemoryLabel();
-        progressPanel.add(memoryLabel);
-
-        topPanel.add(progressPanel, BorderLayout.EAST);
-        add(topPanel, BorderLayout.NORTH);
+        JPanel content = new JPanel(new BorderLayout());
+        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        content.add(createCardPanel(verticalSplit), BorderLayout.CENTER);
+        add(content, BorderLayout.CENTER);
 
         runBtn.addActionListener(e -> startRun(progressLabel));
         stopBtn.addActionListener(e -> stopRun());
@@ -318,6 +236,95 @@ public class PerformancePanel extends SingletonBasePanel {
         loadPersistedConfigAsync();
     }
 
+
+    private JPanel createHeaderPanel() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ModernColors.getDividerBorderColor()));
+        header.setBackground(UIManager.getColor("Panel.background"));
+
+        JLabel title = new JLabel(I18nUtil.getMessage(MessageKeys.MENU_PERFORMANCE));
+        title.setFont(FontsUtil.getDefaultFont(Font.BOLD));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        left.setOpaque(false);
+        left.add(title);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        actions.setOpaque(false);
+        runBtn = new StartButton();
+        stopBtn = new StopButton();
+        stopBtn.setEnabled(false);
+        actions.add(runBtn);
+        actions.add(stopBtn);
+
+        refreshBtn = new RefreshButton();
+        refreshBtn.addActionListener(e -> refreshRequestsFromCollections());
+        actions.add(refreshBtn);
+
+        efficientCheckBox = new JCheckBox(I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE));
+        efficientCheckBox.setSelected(efficientMode);
+        efficientCheckBox.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
+        efficientCheckBox.setForeground(new Color(0, 120, 0));
+
+        String htmlTooltip = "<html><body style='width: 400px; padding: 10px;'>" +
+                "<b style='color: #008000; font-size: 13px;'>" + I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE) + "</b><br><br>" +
+                I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_TOOLTIP_HTML) +
+                "</body></html>";
+        efficientCheckBox.setToolTipText(htmlTooltip);
+
+        efficientCheckBox.addActionListener(e -> {
+            if (!efficientCheckBox.isSelected()) {
+                int result = JOptionPane.showConfirmDialog(PerformancePanel.this,
+                        I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_DISABLE_WARNING),
+                        I18nUtil.getMessage(MessageKeys.PERFORMANCE_EFFICIENT_MODE_WARNING_TITLE),
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
+
+                if (result != JOptionPane.YES_OPTION) {
+                    efficientCheckBox.setSelected(true);
+                    return;
+                }
+            }
+            efficientMode = efficientCheckBox.isSelected();
+            saveAllPropertyPanelData();
+        });
+        actions.add(efficientCheckBox);
+
+        csvDataPanel = new CsvDataPanel();
+        actions.add(csvDataPanel);
+
+        JPanel progressPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        progressPanel.setOpaque(false);
+        progressLabel = new JLabel();
+        progressLabel.setText("0/0");
+        progressLabel.setFont(progressLabel.getFont().deriveFont(Font.BOLD));
+        progressLabel.setIcon(new FlatSVGIcon("icons/users.svg", 20, 20)
+                .setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground"))));
+        progressLabel.setHorizontalTextPosition(SwingConstants.RIGHT);
+        progressPanel.setToolTipText(I18nUtil.getMessage(MessageKeys.PERFORMANCE_PROGRESS_TOOLTIP));
+        progressPanel.add(progressLabel);
+        MemoryLabel memoryLabel = new MemoryLabel();
+        progressPanel.add(memoryLabel);
+
+        JPanel center = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        center.setOpaque(false);
+        center.add(actions);
+
+        header.add(left, BorderLayout.WEST);
+        header.add(center, BorderLayout.CENTER);
+        header.add(progressPanel, BorderLayout.EAST);
+        return header;
+    }
+
+    private JPanel createCardPanel(JComponent content) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ModernColors.getDividerBorderColor()),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+        panel.add(content, BorderLayout.CENTER);
+        return panel;
+    }
 
     private void loadPersistedConfigAsync() {
         SwingWorker<PersistedPerformanceConfig, Void> worker = new SwingWorker<>() {
@@ -630,11 +637,7 @@ public class PerformancePanel extends SingletonBasePanel {
         getPerformanceResultTablePanel().clearResults(); // 清空结果树
         getPerformanceReportPanel().clearReport(); // 清空报表数据
         getPerformanceTrendPanel().clearTrendDataset(); // 清理趋势图历史数据
-        apiCostMap.clear();
-        apiSuccessMap.clear();
-        apiFailMap.clear();
-        allRequestStartTimes.clear();
-        allRequestResults.clear();
+        statistics.reset();
         lastReportResultCount = 0;
         // CSV行索引重置
         csvRowIndex.set(0);
@@ -680,33 +683,18 @@ public class PerformancePanel extends SingletonBasePanel {
                     stopTrendTimer();
                     OkHttpClientManager.setDefaultConnectionPoolConfig();
 
-                    // Create thread-safe copies before updating the report
-                    List<Long> startTimesCopy;
-                    List<RequestResult> resultsCopy;
-                    Map<String, List<Long>> apiCostMapCopy = new HashMap<>();
-
-                    synchronized (allRequestStartTimes) {
-                        startTimesCopy = new ArrayList<>(allRequestStartTimes);
-                    }
-
-                    synchronized (allRequestResults) {
-                        resultsCopy = new ArrayList<>(allRequestResults);
-                    }
-
-                    // Create thread-safe copies for each API cost list
-                    for (Map.Entry<String, List<Long>> entry : apiCostMap.entrySet()) {
-                        List<Long> costList = entry.getValue();
-                        synchronized (costList) {
-                            apiCostMapCopy.put(entry.getKey(), new ArrayList<>(costList));
-                        }
-                    }
-
-                    getPerformanceReportPanel().updateReport(apiCostMapCopy, apiSuccessMap, apiFailMap, startTimesCopy, resultsCopy);
+                    PerformanceReportSnapshot snapshot = statistics.snapshotForReport();
+                    getPerformanceReportPanel().updateReport(
+                            snapshot.getApiCostMap(),
+                            snapshot.getApiSuccessMap(),
+                            snapshot.getApiFailMap(),
+                            snapshot.getRequestStartTimes(),
+                            snapshot.getRequestResults());
 
                     // 显示执行完成提示
                     long totalTime = System.currentTimeMillis() - startTime;
-                    int totalRequests = resultsCopy.size();
-                    long successCount = resultsCopy.stream().filter(r -> r.success).count();
+                    int totalRequests = snapshot.getRequestResults().size();
+                    long successCount = snapshot.getRequestResults().stream().filter(r -> r.success).count();
                     String message = I18nUtil.getMessage(MessageKeys.PERFORMANCE_MSG_EXECUTION_COMPLETED,
                             totalRequests, successCount, totalTime / 1000.0);
                     NotificationUtil.showSuccess(message);
@@ -855,44 +843,19 @@ public class PerformancePanel extends SingletonBasePanel {
      */
     private void refreshReportOnce() {
         try {
-            // 使用statsLock统一保护所有统计数据的复制，确保数据一致性
-            List<Long> startTimesCopy;
-            List<RequestResult> resultsCopy;
-            Map<String, List<Long>> apiCostMapCopy;
-            Map<String, Integer> apiSuccessMapCopy;
-            Map<String, Integer> apiFailMapCopy;
-
-            synchronized (statsLock) {
-                int currentCount = allRequestResults.size();
-                if (currentCount == lastReportResultCount && currentCount > 0) {
-                    return;
-                }
-                lastReportResultCount = currentCount;
-
-                // 1) copy allRequestStartTimes / allRequestResults
-                startTimesCopy = new ArrayList<>(allRequestStartTimes);
-                resultsCopy = new ArrayList<>(allRequestResults);
-
-                // 2) copy apiCostMap（深拷贝每个value列表）
-                apiCostMapCopy = new HashMap<>();
-                for (Map.Entry<String, List<Long>> entry : apiCostMap.entrySet()) {
-                    apiCostMapCopy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
-                }
-
-                // 3) copy apiSuccessMap 和 apiFailMap
-                apiSuccessMapCopy = new HashMap<>(apiSuccessMap);
-                apiFailMapCopy = new HashMap<>(apiFailMap);
+            PerformanceReportSnapshot snapshot = statistics.snapshotForReport();
+            int currentCount = snapshot.getRequestResults().size();
+            if (currentCount == lastReportResultCount && currentCount > 0) {
+                return;
             }
+            lastReportResultCount = currentCount;
 
-
-            // 4) 更新报表（在锁外执行，避免阻塞统计数据写入）
             getPerformanceReportPanel().updateReport(
-                    apiCostMapCopy,
-                    apiSuccessMapCopy,
-                    apiFailMapCopy,
-                    startTimesCopy,
-                    resultsCopy
-            );
+                    snapshot.getApiCostMap(),
+                    snapshot.getApiSuccessMap(),
+                    snapshot.getApiFailMap(),
+                    snapshot.getRequestStartTimes(),
+                    snapshot.getRequestResults());
         } catch (Exception ex) {
             // 不要让 Timer 因异常中断
             log.warn("实时刷新报表失败: {}", ex.getMessage(), ex);
@@ -910,49 +873,11 @@ public class PerformancePanel extends SingletonBasePanel {
         long samplingIntervalMs = samplingIntervalSeconds * 1000L;
         long windowStart = now - samplingIntervalMs;
 
-        // 统计本采样间隔内的请求
-        int totalReq = 0;
-        int errorReq = 0;
-        long totalRespTime = 0;
-        long actualMinTime = Long.MAX_VALUE;
-        long actualMaxTime = 0;
-
-        // 使用statsLock保护，确保数据一致性
-        synchronized (statsLock) {
-            // 遍历所有结果（不能假设顺序，因为多线程并发添加）
-            for (RequestResult result : allRequestResults) {
-                // 只统计在时间窗口内的请求
-                if (result.endTime >= windowStart && result.endTime <= now) {
-                    totalReq++;
-                    if (!result.success) errorReq++;
-                    totalRespTime += result.responseTime;
-                    actualMinTime = Math.min(actualMinTime, result.endTime);
-                    actualMaxTime = Math.max(actualMaxTime, result.endTime);
-                }
-            }
-        }
-
-        double avgRespTime = totalReq > 0 ?
-                BigDecimal.valueOf((double) totalRespTime / totalReq)
-                        .setScale(2, RoundingMode.HALF_UP)
-                        .doubleValue()
-                : 0;
-
-        // 修复QPS计算：使用实际时间跨度，而不是采样间隔
-        double qps = 0;
-        if (totalReq > 0 && actualMaxTime > actualMinTime) {
-            long actualSpanMs = actualMaxTime - actualMinTime;
-            qps = totalReq * 1000.0 / actualSpanMs;
-        } else if (totalReq > 0) {
-            // 如果只有一个请求，使用采样间隔作为分母
-            qps = totalReq / (double) samplingIntervalSeconds;
-        }
-
-        double errorPercent = totalReq > 0 ? (double) errorReq / totalReq * 100 : 0;
+        PerformanceTrendSnapshot snapshot = statistics.snapshotForTrend(windowStart, now, users, samplingIntervalSeconds);
         // 更新趋势图数据
         log.debug("采样数据 {} - 用户数: {}, 平均响应时间: {} ms, QPS: {}, 错误率: {}%, 样本数: {}",
-                second, users, avgRespTime, qps, errorPercent, totalReq);
-        getPerformanceTrendPanel().addOrUpdate(second, users, avgRespTime, qps, errorPercent);
+                second, users, snapshot.getAvgResponseTime(), snapshot.getQps(), snapshot.getErrorPercent(), snapshot.getSampleCount());
+        getPerformanceTrendPanel().addOrUpdate(second, users, snapshot.getAvgResponseTime(), snapshot.getQps(), snapshot.getErrorPercent());
     }
 
     private void updateProgressLabel(JLabel label, int totalThreads) {
@@ -1666,6 +1591,7 @@ public class PerformancePanel extends SingletonBasePanel {
                     csvRow = csvDataPanel.getRowData(rowIdx);
                 }
             }
+
             // ====== 前置脚本 ======
             req = PreparedRequestBuilder.build(jtNode.httpRequestItem);
 
@@ -1701,7 +1627,7 @@ public class PerformancePanel extends SingletonBasePanel {
             }
 
             long startTime = System.currentTimeMillis();
-            allRequestStartTimes.add(startTime); // 记录开始时间
+            statistics.recordStart(startTime); // 记录开始时间
             long costMs = 0;
             boolean interrupted = false; // 标记是否被中断
 
@@ -1744,9 +1670,13 @@ public class PerformancePanel extends SingletonBasePanel {
                             String valStr = assertion.value;
                             try {
                                 int expect = Integer.parseInt(valStr);
-                                if ("=".equals(op)) pass = (resp.code == expect);
-                                else if (">".equals(op)) pass = (resp.code > expect);
-                                else if ("<".equals(op)) pass = (resp.code < expect);
+                                if ("=".equals(op)) {
+                                    pass = (resp.code == expect);
+                                } else if (">".equals(op)) {
+                                    pass = (resp.code > expect);
+                                } else if ("<".equals(op)) {
+                                    pass = (resp.code < expect);
+                                }
                             } catch (Exception ignored) {
                                 log.warn("断言响应码格式错误: {}", valStr);
                             }
@@ -1756,9 +1686,13 @@ public class PerformancePanel extends SingletonBasePanel {
                             long responseTime = resp.costMs > 0 ? resp.costMs : costMs;
                             try {
                                 long expect = Long.parseLong(valStr);
-                                if ("=".equals(op)) pass = (responseTime == expect);
-                                else if (">".equals(op)) pass = (responseTime > expect);
-                                else if ("<".equals(op)) pass = (responseTime < expect);
+                                if ("=".equals(op)) {
+                                    pass = (responseTime == expect);
+                                } else if (">".equals(op)) {
+                                    pass = (responseTime > expect);
+                                } else if ("<".equals(op)) {
+                                    pass = (responseTime < expect);
+                                }
                             } catch (Exception ignored) {
                                 log.warn("断言响应耗时格式错误: {}", valStr);
                             }
@@ -1805,20 +1739,7 @@ public class PerformancePanel extends SingletonBasePanel {
 
             // 如果请求被中断（压测停止），跳过统计，不计入成功或失败
             if (!interrupted) {
-                // 使用statsLock保护统计数据写入，确保与读取的一致性
-                synchronized (statsLock) {
-                    allRequestResults.add(new RequestResult(endTime, success, cost));
-
-
-                    // 更新API统计数据
-                    apiCostMap.computeIfAbsent(apiName, k -> Collections.synchronizedList(new ArrayList<>())).add(cost);
-                    if (success) {
-                        apiSuccessMap.merge(apiName, 1, Integer::sum);
-                    } else {
-                        apiFailMap.merge(apiName, 1, Integer::sum);
-                    }
-                }
-
+                statistics.recordResult(apiName, success, cost, endTime);
                 getPerformanceResultTablePanel().addResult(new ResultNodeInfo(jtNode.httpRequestItem.getName(), success, errorMsg, req, resp, testResults), efficientMode);
             } else {
                 // 被中断的请求，记录日志但不计入统计
@@ -2265,11 +2186,7 @@ public class PerformancePanel extends SingletonBasePanel {
         getPerformanceResultTablePanel().clearResults();
         getPerformanceReportPanel().clearReport();
         getPerformanceTrendPanel().clearTrendDataset();
-        apiCostMap.clear();
-        apiSuccessMap.clear();
-        apiFailMap.clear();
-        allRequestStartTimes.clear();
-        allRequestResults.clear();
+        statistics.reset();
         csvRowIndex.set(0);
 
         // 主动触发GC，及时释放清除的缓存数据占用的内存

@@ -406,6 +406,23 @@ public class WorkspaceService {
     }
 
     /**
+     * 更新工作区基础信息
+     */
+    public void updateWorkspaceBasicInfo(String workspaceId, String newName, String description) {
+        Workspace workspace = getWorkspaceById(workspaceId);
+        if (!WorkspaceStorageUtil.isDefaultWorkspace(workspace)) {
+            if (newName == null || newName.trim().isEmpty()) {
+                throw new IllegalArgumentException("Workspace name cannot be empty");
+            }
+            workspace.setName(newName.trim());
+        }
+        workspace.setDescription(description == null ? "" : description.trim());
+        workspace.setUpdatedAt(System.currentTimeMillis());
+        saveWorkspaces();
+        log.info("Updated workspace info: {}", workspace.getName());
+    }
+
+    /**
      * 重命名工作区
      */
     public void renameWorkspace(String workspaceId, String newName) {

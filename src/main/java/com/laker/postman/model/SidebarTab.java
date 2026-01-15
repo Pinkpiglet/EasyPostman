@@ -4,8 +4,6 @@ import com.formdev.flatlaf.extras.FlatSVGIcon;
 import com.laker.postman.common.SingletonFactory;
 import com.laker.postman.common.constants.ModernColors;
 import com.laker.postman.panel.collections.RequestCollectionsPanel;
-import com.laker.postman.panel.env.EnvironmentPanel;
-import com.laker.postman.panel.functional.FunctionalPanel;
 import com.laker.postman.panel.history.HistoryPanel;
 import com.laker.postman.panel.performance.PerformancePanel;
 import com.laker.postman.panel.toolbox.ToolboxPanel;
@@ -29,20 +27,10 @@ public enum SidebarTab {
             "icons/collections.svg",
             () -> SingletonFactory.getInstance(RequestCollectionsPanel.class)
     ),
-    ENVIRONMENTS(
-            MessageKeys.MENU_ENVIRONMENTS,
-            "icons/environments.svg",
-            () -> SingletonFactory.getInstance(EnvironmentPanel.class)
-    ),
     WORKSPACES(
             MessageKeys.MENU_WORKSPACES,
             "icons/workspace.svg",
             () -> SingletonFactory.getInstance(WorkspacePanel.class)
-    ),
-    FUNCTIONAL(
-            MessageKeys.MENU_FUNCTIONAL,
-            "icons/functional.svg",
-            () -> SingletonFactory.getInstance(FunctionalPanel.class)
     ),
     PERFORMANCE(
             MessageKeys.MENU_PERFORMANCE,

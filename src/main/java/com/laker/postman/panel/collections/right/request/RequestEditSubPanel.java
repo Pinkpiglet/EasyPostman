@@ -12,7 +12,9 @@ import com.laker.postman.panel.collections.left.RequestCollectionsLeftPanel;
 import com.laker.postman.panel.collections.right.RequestEditPanel;
 import com.laker.postman.panel.collections.right.request.sub.*;
 import com.laker.postman.panel.history.HistoryPanel;
+import com.laker.postman.common.constants.ModernColors;
 import com.laker.postman.panel.sidebar.ConsolePanel;
+import com.laker.postman.panel.sidebar.cookie.CookieManagerDialog;
 import com.laker.postman.service.EnvironmentService;
 import com.laker.postman.service.collections.GroupInheritanceHelper;
 import com.laker.postman.service.http.HttpSingleRequestExecutor;
@@ -84,6 +86,7 @@ public class RequestEditSubPanel extends JPanel {
     private final AuthTabPanel authTabPanel;
     private final ScriptPanel scriptPanel;
     private final JTabbedPane reqTabs; // 请求选项卡面板
+    private CookieManagerDialog cookieManagerDialog;
 
     // 当前请求的 SwingWorker，用于支持取消
     private transient SwingWorker<Void, Void> currentWorker;
@@ -207,7 +210,8 @@ public class RequestEditSubPanel extends JPanel {
         // 只有 HTTP 协议且非 SAVED_RESPONSE 类型才启用保存响应按钮
         boolean enableSaveButton = protocol.isHttpProtocol() && panelType != RequestEditSubPanelType.SAVED_RESPONSE;
         responsePanel = new ResponsePanel(protocol, enableSaveButton);
-        splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, reqTabs, responsePanel);
+        JComponent requestTabsContainer = createRequestTabsContainer();
+        splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, requestTabsContainer, responsePanel);
         splitPane.setDividerSize(5); // 设置分割条的宽度（增大以提高拖拽灵敏度）
         splitPane.setResizeWeight(0.4); // 设置分割线位置，请求和响应各占40%（降低响应面板默认高度）
         add(splitPane, BorderLayout.CENTER);
@@ -490,8 +494,10 @@ public class RequestEditSubPanel extends JPanel {
             @Override
             protected Void doInBackground() {
                 try {
-                    responsePanel.setResponseTabButtonsEnable(true);
-                    responsePanel.switchTabButtonHttpOrSse("http");
+                    SwingUtilities.invokeAndWait(() -> {
+                        responsePanel.setResponseTabButtonsEnable(true);
+                        responsePanel.switchTabButtonHttpOrSse("http");
+                    });
                     resp = RedirectHandler.executeWithRedirects(req, 10, new SseResEventListener() {
                         @Override
                         public void onOpen(HttpResponse response) {
@@ -1126,14 +1132,55 @@ public class RequestEditSubPanel extends JPanel {
         }
         responsePanel.setResponseHeaders(resp);
         if (!protocol.isWebSocketProtocol() && !protocol.isSseProtocol()) {
+            responsePanel.getResponseBodyPanel().setEnabled(true);
             responsePanel.setTiming(resp);
             responsePanel.setResponseBody(resp);
-            responsePanel.getResponseBodyPanel().setEnabled(true);
+            responsePanel.setResponseTabButtonsEnable(true);
+            responsePanel.switchTabButtonHttpOrSse("http");
+            responsePanel.selectTab(0);
+            responsePanel.refreshBodyTab();
+            responsePanel.revalidate();
+            responsePanel.repaint();
         }
         Color statusColor = getStatusColor(resp.code);
         responsePanel.setStatus(statusText, statusColor);
         responsePanel.setResponseTime(resp.costMs);
         responsePanel.setResponseSize(resp.bodySize, resp.httpEventInfo);
+    }
+
+    private JComponent createRequestTabsContainer() {
+        JPanel container = new JPanel(new BorderLayout());
+        container.add(reqTabs, BorderLayout.CENTER);
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setOpaque(false);
+        rightPanel.add(Box.createVerticalStrut(4));
+        rightPanel.add(createCookieButton());
+        rightPanel.add(Box.createVerticalGlue());
+
+        container.add(rightPanel, BorderLayout.EAST);
+        return container;
+    }
+
+    private JButton createCookieButton() {
+        JButton button = new JButton("Cookie");
+        button.setToolTipText(I18nUtil.getMessage(MessageKeys.COOKIES_MANAGER_TITLE));
+        button.setFont(FontsUtil.getDefaultFontWithOffset(Font.PLAIN, -1));
+        button.setForeground(ModernColors.PRIMARY);
+        button.setFocusable(false);
+        button.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        button.setContentAreaFilled(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private void openCookieManager() {
+        if (cookieManagerDialog == null) {
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            cookieManagerDialog = new CookieManagerDialog(parent);
+        }
+        cookieManagerDialog.setVisible(true);
     }
 
     private void setTestResults(List<TestResult> testResults) {

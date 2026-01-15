@@ -5,6 +5,8 @@ import com.laker.postman.common.SingletonBasePanel;
 import com.laker.postman.common.SingletonFactory;
 import com.laker.postman.common.component.SearchTextField;
 import com.laker.postman.common.constants.ModernColors;
+import com.laker.postman.util.I18nUtil;
+import com.laker.postman.util.MessageKeys;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
@@ -346,7 +348,7 @@ public class ConsolePanel extends SingletonBasePanel {
         logLevelFilter = new JComboBox<>(new String[]{"All", "INFO", "ERROR", "WARN", "DEBUG"});
         logLevelFilter.setPreferredSize(new Dimension(90, 28));
         logLevelFilter.setFocusable(false);
-        logLevelFilter.setToolTipText("Filter logs by level");
+        logLevelFilter.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_FILTER_LEVEL));
 
         searchField = new SearchTextField();
         searchField.setPreferredSize(new Dimension(200, 28));
@@ -355,7 +357,7 @@ public class ConsolePanel extends SingletonBasePanel {
         FlatSVGIcon prevIcon = new FlatSVGIcon("icons/arrow-up.svg", 16, 16);
         prevIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")));
         prevBtn.setIcon(prevIcon);
-        prevBtn.setToolTipText("Previous match (Shift+Enter)");
+        prevBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_PREV_MATCH));
         prevBtn.setFocusable(false);
         prevBtn.setPreferredSize(new Dimension(28, 28));
 
@@ -363,7 +365,7 @@ public class ConsolePanel extends SingletonBasePanel {
         FlatSVGIcon nextIcon = new FlatSVGIcon("icons/arrow-down.svg", 16, 16);
         nextIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")));
         nextBtn.setIcon(nextIcon);
-        nextBtn.setToolTipText("Next match (Enter)");
+        nextBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_NEXT_MATCH));
         nextBtn.setFocusable(false);
         nextBtn.setPreferredSize(new Dimension(28, 28));
 
@@ -387,7 +389,7 @@ public class ConsolePanel extends SingletonBasePanel {
         autoScrollIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")));
         autoScrollBtn.setIcon(autoScrollIcon);
         autoScrollBtn.setSelected(true);
-        autoScrollBtn.setToolTipText("Auto-scroll to bottom");
+        autoScrollBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_AUTO_SCROLL));
         autoScrollBtn.setFocusable(false);
         autoScrollBtn.setPreferredSize(new Dimension(28, 28));
 
@@ -398,7 +400,7 @@ public class ConsolePanel extends SingletonBasePanel {
         FlatSVGIcon closeIcon = new FlatSVGIcon("icons/close.svg", 16, 16);
         closeIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")));
         closeBtn.setIcon(closeIcon);
-        closeBtn.setToolTipText("Hide console");
+        closeBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_HIDE));
         closeBtn.setFocusable(false);
         closeBtn.setPreferredSize(new Dimension(28, 28));
 
@@ -418,7 +420,7 @@ public class ConsolePanel extends SingletonBasePanel {
         FlatSVGIcon clearIcon = new FlatSVGIcon("icons/clear.svg", 16, 16);
         clearIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor("Button.foreground")));
         clearBtn.setIcon(clearIcon);
-        clearBtn.setToolTipText("Clear console");
+        clearBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CONSOLE_CLEAR));
         clearBtn.setFocusable(false);
         clearBtn.addActionListener(e -> clearConsole());
         return clearBtn;

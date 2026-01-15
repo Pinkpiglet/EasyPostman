@@ -6,6 +6,8 @@ import com.laker.postman.model.HttpFormUrlencoded;
 import com.laker.postman.model.HttpResponse;
 import com.laker.postman.model.PreparedRequest;
 import com.laker.postman.model.script.TestResult;
+import com.laker.postman.util.I18nUtil;
+import com.laker.postman.util.MessageKeys;
 import lombok.experimental.UtilityClass;
 
 import java.text.SimpleDateFormat;
@@ -227,7 +229,8 @@ public class HttpHtmlRenderer {
      */
     public static String renderTestResults(List<TestResult> testResults) {
         if (testResults == null || testResults.isEmpty()) {
-            return createHtmlDocument("font-size:9px;", "<div style='color:#888;padding:16px;'>No test results</div>");
+            return createHtmlDocument("font-size:9px;", "<div style='color:#888;padding:16px;'>" +
+                    I18nUtil.getMessage(MessageKeys.TEST_RESULTS_EMPTY) + "</div>");
         }
 
         String bgColor = getThemeBackground();

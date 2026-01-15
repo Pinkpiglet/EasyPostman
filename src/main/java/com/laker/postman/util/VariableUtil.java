@@ -58,16 +58,18 @@ public class VariableUtil {
     }
 
     public static boolean isVariableDefined(String varName) {
-        if (varName == null) return false;
+        String normalizedName = varName == null ? "" : varName.trim();
+        if (normalizedName.isEmpty()) return false;
         Environment activeEnv = EnvironmentService.getActiveEnvironment();
-        return activeEnv != null && activeEnv.getVariable(varName) != null;
+        return activeEnv != null && activeEnv.getVariable(normalizedName) != null;
     }
 
     public static String getVariableValue(String varName) {
-        if (varName == null) return null;
+        String normalizedName = varName == null ? "" : varName.trim();
+        if (normalizedName.isEmpty()) return null;
         Environment activeEnv = EnvironmentService.getActiveEnvironment();
-        if (activeEnv != null && activeEnv.getVariable(varName) != null) {
-            Object v = activeEnv.getVariable(varName);
+        if (activeEnv != null && activeEnv.getVariable(normalizedName) != null) {
+            Object v = activeEnv.getVariable(normalizedName);
             return v == null ? null : v.toString();
         }
         return null;

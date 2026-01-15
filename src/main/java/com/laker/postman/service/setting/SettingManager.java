@@ -469,12 +469,12 @@ public class SettingManager {
         return getDefaultFontSize(); // 根据操作系统返回默认字体大小
     }
 
-    /**
-     * 获取默认字体大小
-     * 所有平台统一使用 13 号字体
-     */
+     /**
+      * 获取默认字体大小
+      * 所有平台统一使用 14 号字体
+      */
     private static int getDefaultFontSize() {
-        return 13; // 所有平台统一默认 13号
+        return 14; // Material 风格默认字号
     }
 
     public static void setUiFontSize(int size) {

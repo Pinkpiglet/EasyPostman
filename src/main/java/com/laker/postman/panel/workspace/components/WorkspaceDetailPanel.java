@@ -3,9 +3,11 @@ package com.laker.postman.panel.workspace.components;
 import com.laker.postman.model.GitRepoSource;
 import com.laker.postman.model.Workspace;
 import com.laker.postman.model.WorkspaceType;
+import com.laker.postman.service.EnvironmentService;
 import com.laker.postman.util.FontsUtil;
 import com.laker.postman.util.I18nUtil;
 import com.laker.postman.util.MessageKeys;
+import com.laker.postman.util.SystemUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -73,9 +75,21 @@ public class WorkspaceDetailPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         infoSection.add(new JLabel(workspace.getDescription()), gbc);
 
-        // 创建时间
+        // 环境地址
         gbc.gridx = 0;
         gbc.gridy = 4;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        infoSection.add(new JLabel(I18nUtil.getMessage(MessageKeys.WORKSPACE_DETAIL_ENVIRONMENT_URL) + ":"), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        String baseUrl = EnvironmentService.getWorkspaceBaseUrl(SystemUtil.getEnvPathForWorkspace(workspace));
+        infoSection.add(new JLabel((baseUrl == null || baseUrl.isBlank()) ? "-" : baseUrl), gbc);
+
+        // 创建时间
+        gbc.gridx = 0;
+        gbc.gridy = 5;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         infoSection.add(new JLabel(I18nUtil.getMessage(MessageKeys.WORKSPACE_DETAIL_CREATED_TIME) + ":"), gbc);

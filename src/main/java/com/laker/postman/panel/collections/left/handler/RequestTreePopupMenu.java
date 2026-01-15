@@ -95,15 +95,6 @@ public class RequestTreePopupMenu {
     private void addGroupMenuItems(JPopupMenu menu, DefaultMutableTreeNode selectedNode, boolean isMultipleSelection) {
         menu.addSeparator();
 
-        // 添加到功能测试
-        JMenuItem addToFunctional = createMenuItem(
-                MessageKeys.COLLECTIONS_MENU_ADD_TO_FUNCTIONAL,
-                "icons/functional.svg",
-                e -> actions.addSelectedRequestsToFunctionalTest()
-        );
-        menu.add(addToFunctional);
-        menu.addSeparator();
-
         // 新增请求
         JMenuItem addRequest = createMenuItem(
                 MessageKeys.COLLECTIONS_MENU_ADD_REQUEST,
@@ -156,15 +147,6 @@ public class RequestTreePopupMenu {
      * 添加请求相关菜单项
      */
     private void addRequestMenuItems(JPopupMenu menu, boolean isMultipleSelection) {
-        // 添加到功能测试
-        JMenuItem addToFunctional = createMenuItem(
-                MessageKeys.COLLECTIONS_MENU_ADD_TO_FUNCTIONAL,
-                "icons/functional.svg",
-                e -> actions.addSelectedRequestsToFunctionalTest()
-        );
-        menu.add(addToFunctional);
-        menu.addSeparator();
-
         // 复制（创建副本）
         JMenuItem duplicate = createMenuItem(
                 MessageKeys.COLLECTIONS_MENU_DUPLICATE,

@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
 import java.io.Serial;
 
 /**
@@ -27,14 +26,9 @@ public class SplashWindow extends JWindow {
     @Serial
     private static final long serialVersionUID = 1L; // 添加序列化ID
     public static final int MIN_TIME = 1000; // 最小显示时间，避免闪屏
-    private static final float FADE_STEP = 0.08f; // 渐隐步长
-    private static final float MIN_OPACITY = 0.05f; // 最小透明度
-    private static final int FADE_TIMER_DELAY = 15; // 渐隐定时器延迟
 
     private JLabel statusLabel; // 状态标签，用于显示加载状态
     private JProgressBar progressBar;
-    private transient Timer fadeOutTimer; // 渐隐计时器
-    private transient ActionListener fadeOutListener; // 渐隐监听器，用于防止内存泄漏
     private volatile boolean isDisposed = false; // 标记窗口是否已释放
 
 
@@ -407,81 +401,14 @@ public class SplashWindow extends JWindow {
     private void startFadeOutAnimation(MainFrame mainFrame) {
         if (isDisposed) return;
 
-        // 在开始渐隐动画之前就显示主窗口，实现重叠效果
         SwingUtilities.invokeLater(() -> {
             if (mainFrame != null) {
                 mainFrame.setVisible(true);
-                // 确保主窗口在前面
                 mainFrame.toFront();
                 mainFrame.requestFocus();
             }
+            disposeSafely();
         });
-
-        fadeOutListener = createFadeOutListener();
-        fadeOutTimer = new Timer(FADE_TIMER_DELAY, fadeOutListener);
-        fadeOutTimer.start();
-    }
-
-    /**
-     * 创建渐隐监听器
-     */
-    private ActionListener createFadeOutListener() {
-        return e -> {
-            if (isDisposed) {
-                stopFadeOutAnimation();
-                return;
-            }
-
-            try {
-                processFadeOutStep();
-            } catch (Exception ex) {
-                handleFadeOutError(ex);
-            }
-        };
-    }
-
-    /**
-     * 处理渐隐步骤
-     */
-    private void processFadeOutStep() {
-        float opacity = getOpacity();
-        if (opacity > MIN_OPACITY) {
-            setOpacity(Math.max(0f, opacity - FADE_STEP));
-        } else {
-            completeFadeOut();
-        }
-    }
-
-    /**
-     * 完成渐隐效果
-     */
-    private void completeFadeOut() {
-        stopFadeOutAnimation();
-        disposeSafely();
-    }
-
-    /**
-     * 处理渐隐错误
-     */
-    private void handleFadeOutError(Exception ex) {
-        log.warn("渐隐动画执行失败，直接关闭窗口", ex);
-        stopFadeOutAnimation();
-        disposeSafely();
-        // 主窗口在渐隐开始前就已经显示，这里不需要再显示
-    }
-
-    /**
-     * 停止渐隐动画
-     */
-    private void stopFadeOutAnimation() {
-        if (fadeOutTimer != null) {
-            fadeOutTimer.stop();
-            if (fadeOutListener != null) {
-                fadeOutTimer.removeActionListener(fadeOutListener);
-            }
-            fadeOutTimer = null;
-            fadeOutListener = null;
-        }
     }
 
     /**
@@ -491,7 +418,6 @@ public class SplashWindow extends JWindow {
         if (isDisposed) return;
 
         isDisposed = true;
-        stopFadeOutAnimation();
 
         SwingUtilities.invokeLater(() -> {
             setVisible(false);

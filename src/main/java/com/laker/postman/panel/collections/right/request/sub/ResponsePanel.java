@@ -41,6 +41,7 @@ public class ResponsePanel extends JPanel {
 
     private ResponseHeadersPanel responseHeadersPanel;
     private ResponseBodyPanel responseBodyPanel;
+    private HttpResponse lastBodyResponse;
     private NetworkLogPanel networkLogPanel;
     private TimelinePanel timelinePanel;
     private JEditorPane testsPane;
@@ -155,12 +156,12 @@ public class ResponsePanel extends JPanel {
             topResponseBar.add(statusBar, BorderLayout.EAST);
             add(topResponseBar, BorderLayout.NORTH);
             cardPanel = new JPanel(new CardLayout());
-            addHttpTab(tabNames[HTTP_TAB_BODY], () -> {
-                responseBodyPanel = new ResponseBodyPanel(enableSaveButton);
-                responseBodyPanel.setEnabled(false);
-                responseBodyPanel.setBodyText(null);
-                return responseBodyPanel;
-            });
+            responseBodyPanel = new ResponseBodyPanel(enableSaveButton);
+            responseBodyPanel.setEnabled(false);
+            responseBodyPanel.setBodyText(null);
+            cardPanel.add(responseBodyPanel, tabNames[HTTP_TAB_BODY]);
+            loadedResponseTabs.add(HTTP_TAB_BODY);
+            responseTabFactories.add(() -> responseBodyPanel);
             addHttpTab(tabNames[HTTP_TAB_HEADERS], () -> {
                 responseHeadersPanel = new ResponseHeadersPanel();
                 return responseHeadersPanel;
@@ -178,7 +179,7 @@ public class ResponsePanel extends JPanel {
                 sseResponsePanel = new SSEResponsePanel();
                 return sseResponsePanel;
             });
-            ensureResponseTabLoaded(HTTP_TAB_BODY);
+            selectTab(HTTP_TAB_BODY);
             webSocketResponsePanel = null;
 
         }
@@ -207,14 +208,63 @@ public class ResponsePanel extends JPanel {
         }
     }
 
+    public void selectTab(int index) {
+        if (index < 0 || index >= tabButtons.length) {
+            return;
+        }
+        ensureResponseTabLoaded(index);
+        CardLayout layout = (CardLayout) cardPanel.getLayout();
+        layout.show(cardPanel, tabNames[index]);
+        selectedTabIndex = index;
+        for (JButton btn : tabButtons) {
+            btn.repaint();
+        }
+        cardPanel.revalidate();
+        cardPanel.repaint();
+    }
+
+    public void refreshBodyTab() {
+        if (!protocol.isHttpProtocol() || selectedTabIndex != HTTP_TAB_BODY) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            ensureResponseTabLoaded(HTTP_TAB_HEADERS);
+            ensureResponseTabLoaded(HTTP_TAB_BODY);
+            CardLayout layout = (CardLayout) cardPanel.getLayout();
+            layout.show(cardPanel, tabNames[HTTP_TAB_HEADERS]);
+            layout.show(cardPanel, tabNames[HTTP_TAB_BODY]);
+            cardPanel.revalidate();
+            cardPanel.repaint();
+        });
+    }
+
     public void setResponseBody(HttpResponse resp) {
         if (protocol.isWebSocketProtocol() || protocol.isSseProtocol()) {
             // WebSocket 和 SSE 响应体由专门的面板维护，不做处理
             return;
         }
+        lastBodyResponse = resp;
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> setResponseBody(resp));
+            return;
+        }
         ResponseBodyPanel panel = getResponseBodyPanel();
         if (panel != null) {
             panel.setBodyText(resp);
+            panel.revalidate();
+            panel.repaint();
+            SwingUtilities.invokeLater(() -> {
+                String text = panel.getResponseBodyPane().getText();
+                if ((text == null || text.isEmpty()) && resp.body != null && !resp.body.isEmpty()) {
+                    panel.setBodyText(resp);
+                }
+            });
+        }
+        cardPanel.revalidate();
+        cardPanel.repaint();
+        if (selectedTabIndex == HTTP_TAB_BODY) {
+            CardLayout layout = (CardLayout) cardPanel.getLayout();
+            layout.show(cardPanel, tabNames[HTTP_TAB_BODY]);
         }
     }
 
@@ -504,7 +554,9 @@ public class ResponsePanel extends JPanel {
 
     private void addHttpTab(String name, java.util.function.Supplier<JComponent> factory) {
         responseTabFactories.add(factory);
-        cardPanel.add(createLoadingPanel(), name);
+        JPanel loadingPanel = createLoadingPanel();
+        loadingPanel.setName(name + "_loading");
+        cardPanel.add(loadingPanel, name + "_loading");
     }
 
     private JPanel createLoadingPanel() {
@@ -522,11 +574,24 @@ public class ResponsePanel extends JPanel {
         if (index < 0 || index >= responseTabFactories.size() || loadedResponseTabs.contains(index)) {
             return;
         }
+        String tabName = tabNames[index];
+        String loadingName = tabName + "_loading";
+        for (Component component : cardPanel.getComponents()) {
+            if (loadingName.equals(component.getName())) {
+                cardPanel.remove(component);
+                break;
+            }
+        }
         JComponent component = responseTabFactories.get(index).get();
-        cardPanel.add(component, tabNames[index]);
+        cardPanel.add(component, tabName);
         loadedResponseTabs.add(index);
+        if (index == HTTP_TAB_BODY && lastBodyResponse != null && responseBodyPanel != null) {
+            responseBodyPanel.setBodyText(lastBodyResponse);
+        }
         CardLayout layout = (CardLayout) cardPanel.getLayout();
-        layout.show(cardPanel, tabNames[index]);
+        layout.show(cardPanel, tabName);
+        cardPanel.revalidate();
+        cardPanel.repaint();
     }
 
     public ResponseBodyPanel getResponseBodyPanel() {

@@ -33,7 +33,6 @@ public final class MessageKeys {
     public static final String MENU_TOOLBOX = "menu.toolbox";
 
     // ============ 语言相关 ============
-    public static final String LANGUAGE_CHANGED = "language.changed";
     public static final String LANGUAGE_ENGLISH = "language.english";
     public static final String LANGUAGE_CHINESE = "language.chinese";
 
@@ -74,6 +73,37 @@ public final class MessageKeys {
     public static final String GENERAL_CANCEL = "button.cancel";
     public static final String GENERAL_SEARCH = "general.search";
     public static final String GENERAL_LOADING = "general.loading";
+
+    // ============ 工具提示 ============
+    public static final String TOOLTIP_NAV_PREVIOUS = "tooltip.nav.previous";
+    public static final String TOOLTIP_NAV_NEXT = "tooltip.nav.next";
+    public static final String TOOLTIP_WRAP = "tooltip.wrap";
+    public static final String TOOLTIP_FORMAT = "tooltip.format";
+    public static final String TOOLTIP_DOWNLOAD = "tooltip.download";
+    public static final String TOOLTIP_SAVE_RESPONSE = "tooltip.save_response";
+    public static final String TOOLTIP_ASSERTION_RESPONSE_TIME = "tooltip.assertion.response_time";
+    public static final String TOOLTIP_ASSERTION_RESPONSE_CODE = "tooltip.assertion.response_code";
+    public static final String TOOLTIP_ASSERTION_HELP_HTML = "tooltip.assertion.help_html";
+    public static final String TOOLTIP_SIDEBAR_EXPAND = "tooltip.sidebar.expand";
+    public static final String TOOLTIP_SIDEBAR_COLLAPSE = "tooltip.sidebar.collapse";
+    public static final String TOOLTIP_VERSION = "tooltip.version";
+    public static final String TOOLTIP_HASH_CALCULATE = "tooltip.hash.calculate";
+    public static final String TOOLTIP_HASH_COPY = "tooltip.hash.copy";
+    public static final String TOOLTIP_HASH_CLEAR = "tooltip.hash.clear";
+    public static final String TOOLTIP_CRYPTO_ENCRYPT = "tooltip.crypto.encrypt";
+    public static final String TOOLTIP_CRYPTO_DECRYPT = "tooltip.crypto.decrypt";
+    public static final String TOOLTIP_CRYPTO_COPY = "tooltip.crypto.copy";
+    public static final String TOOLTIP_CRYPTO_CLEAR = "tooltip.crypto.clear";
+    public static final String TOOLTIP_CONSOLE_FILTER_LEVEL = "tooltip.console.filter_level";
+    public static final String TOOLTIP_CONSOLE_PREV_MATCH = "tooltip.console.prev_match";
+    public static final String TOOLTIP_CONSOLE_NEXT_MATCH = "tooltip.console.next_match";
+    public static final String TOOLTIP_CONSOLE_AUTO_SCROLL = "tooltip.console.auto_scroll";
+    public static final String TOOLTIP_CONSOLE_HIDE = "tooltip.console.hide";
+    public static final String TOOLTIP_CONSOLE_CLEAR = "tooltip.console.clear";
+
+    // ============ 断言 ============
+    public static final String ASSERTION_TYPE_LABEL = "assertion.type.label";
+    public static final String TEST_RESULTS_EMPTY = "test.results.empty";
 
     public static final String CONSOLE_TITLE = "console.title";
 
@@ -264,6 +294,7 @@ public final class MessageKeys {
     public static final String ENV_DIALOG_EXPORT_TITLE = "env.dialog.export.title";
     public static final String ENV_DIALOG_EXPORT_SUCCESS = "env.dialog.export.success";
     public static final String ENV_DIALOG_EXPORT_FAIL = "env.dialog.export.fail";
+    public static final String ENV_BASE_URL = "env.base_url";
     public static final String ENV_DIALOG_IMPORT_EASY_TITLE = "env.dialog.import_easy.title";
     public static final String ENV_DIALOG_IMPORT_EASY_SUCCESS = "env.dialog.import_easy.success";
     public static final String ENV_DIALOG_IMPORT_EASY_FAIL = "env.dialog.import_easy.fail";
@@ -303,6 +334,7 @@ public final class MessageKeys {
     public static final String WORKSPACE_TYPE_LOCAL = "workspace.type.local";
     public static final String WORKSPACE_TYPE_GIT = "workspace.type.git";
     public static final String WORKSPACE_PATH = "workspace.path";
+    public static final String WORKSPACE_ENVIRONMENT_URL = "workspace.environment.url";
     public static final String WORKSPACE_SELECT_PATH = "workspace.select.path";
     public static final String WORKSPACE_GIT_URL = "workspace.git.url";
     public static final String WORKSPACE_GIT_USERNAME = "workspace.git.username";
@@ -319,11 +351,13 @@ public final class MessageKeys {
     public static final String WORKSPACE_GIT_SSH_KEY_PATH = "workspace.git.ssh.private_key";
     public static final String WORKSPACE_CLONE_FROM_REMOTE = "workspace.clone.from.remote";
     public static final String WORKSPACE_INIT_LOCAL = "workspace.init.local";
+    public static final String WORKSPACE_EDIT = "workspace.edit";
     public static final String WORKSPACE_RENAME = "workspace.rename";
     public static final String WORKSPACE_DELETE = "workspace.delete";
     public static final String WORKSPACE_DELETE_CONFIRM = "workspace.delete.confirm";
     public static final String WORKSPACE_SWITCH = "workspace.switch";
     public static final String WORKSPACE_INFO = "workspace.info";
+    public static final String WORKSPACE_PANEL_HINT = "workspace.panel.hint";
     public static final String WORKSPACE_GIT_PULL = "workspace.git.pull";
     public static final String WORKSPACE_GIT_PUSH = "workspace.git.push";
     public static final String WORKSPACE_GIT_COMMIT = "workspace.git.commit";
@@ -359,6 +393,7 @@ public final class MessageKeys {
 
     // ============ 工作区详情面板相关 ============
     public static final String WORKSPACE_DETAIL_BASIC_INFO = "workspace.detail.basic_info";
+    public static final String WORKSPACE_DETAIL_ENVIRONMENT_URL = "workspace.detail.environment.url";
     public static final String WORKSPACE_DETAIL_CREATED_TIME = "workspace.detail.created_time";
     public static final String WORKSPACE_DETAIL_GIT_INFO = "workspace.detail.git_info";
     public static final String WORKSPACE_DETAIL_REPO_SOURCE = "workspace.detail.repo_source";
@@ -1520,6 +1555,26 @@ public final class MessageKeys {
     public static final String TOOLBOX_DIFF_MODIFIED = "toolbox.diff.modified";
     public static final String TOOLBOX_DIFF_COMPARE = "toolbox.diff.compare";
     public static final String TOOLBOX_DIFF_RESULT = "toolbox.diff.result";
+    public static final String TOOLBOX_PROFILE = "toolbox.profile";
+    public static final String TOOLBOX_PROFILE_CONFIG = "toolbox.profile.config";
+    public static final String TOOLBOX_PROFILE_PROVINCE = "toolbox.profile.province";
+    public static final String TOOLBOX_PROFILE_PROVINCE_RANDOM = "toolbox.profile.province.random";
+    public static final String TOOLBOX_PROFILE_COUNT = "toolbox.profile.count";
+    public static final String TOOLBOX_PROFILE_GENERATE = "toolbox.profile.generate";
+    public static final String TOOLBOX_PROFILE_OUTPUT = "toolbox.profile.output";
+    public static final String TOOLBOX_PROFILE_STATUS = "toolbox.profile.status";
+    public static final String TOOLBOX_PROFILE_EXPORT_EXCEL = "toolbox.profile.export.excel";
+    public static final String TOOLBOX_PROFILE_EXPORT_JSON = "toolbox.profile.export.json";
+    public static final String TOOLBOX_PROFILE_COLUMN_NAME = "toolbox.profile.column.name";
+    public static final String TOOLBOX_PROFILE_COLUMN_PHONE = "toolbox.profile.column.phone";
+    public static final String TOOLBOX_PROFILE_COLUMN_IDCARD = "toolbox.profile.column.idcard";
+    public static final String TOOLBOX_PROFILE_COLUMN_PROVINCE = "toolbox.profile.column.province";
+    public static final String TOOLBOX_PROFILE_COLUMN_CITY = "toolbox.profile.column.city";
+    public static final String TOOLBOX_PROFILE_COLUMN_DISTRICT = "toolbox.profile.column.district";
+    public static final String TOOLBOX_PROFILE_COLUMN_ADDRESS = "toolbox.profile.column.address";
+    public static final String TOOLBOX_PROFILE_COLUMN_EMAIL = "toolbox.profile.column.email";
+    public static final String TOOLBOX_PROFILE_COLUMN_COMPANY = "toolbox.profile.column.company";
+    public static final String TOOLBOX_PROFILE_COLUMN_CREDIT_CODE = "toolbox.profile.column.credit_code";
 
     public static final String TOOLBOX_CRON = "toolbox.cron";
     public static final String TOOLBOX_CRON_EXPRESSION = "toolbox.cron.expression";

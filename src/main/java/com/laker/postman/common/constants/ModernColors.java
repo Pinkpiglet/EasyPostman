@@ -30,51 +30,53 @@ public final class ModernColors {
     // ==================== 主色系 ====================
 
     /**
-     * 主色 - Blue-500（iOS蓝）
+     * 主色 - AHAS 蓝
      */
-    public static final Color PRIMARY = new Color(0, 122, 255);
+    public static final Color PRIMARY = new Color(22, 119, 255);
 
     /**
-     * 主色深色 - Blue-600
+     * 主色深色
      */
-    public static final Color PRIMARY_DARK = new Color(0, 102, 221);
+    public static final Color PRIMARY_DARK = new Color(9, 88, 217);
 
     /**
-     * 主色超深 - Blue-700
+     * 主色超深
      */
-    public static final Color PRIMARY_DARKER = new Color(0, 88, 191);
+    public static final Color PRIMARY_DARKER = new Color(0, 62, 179);
 
     /**
-     * 主色浅色 - Blue-400
+     * 主色浅色
      */
-    public static final Color PRIMARY_LIGHT = new Color(51, 153, 255);
+    public static final Color PRIMARY_LIGHT = new Color(105, 177, 255);
 
     /**
-     * 主色超浅 - Blue-100
+     * 主色超浅
      */
-    public static final Color PRIMARY_LIGHTER = new Color(219, 234, 254);
+    public static final Color PRIMARY_LIGHTER = new Color(230, 240, 255);
+
 
     // ==================== 辅助色系 ====================
 
     /**
-     * 辅助色 - Sky-500
+     * 辅助色
      */
-    public static final Color SECONDARY = new Color(14, 165, 233);
+    public static final Color SECONDARY = new Color(54, 110, 255);
 
     /**
-     * 辅助色深色 - Sky-600
+     * 辅助色深色
      */
-    public static final Color SECONDARY_DARK = new Color(2, 132, 199);
+    public static final Color SECONDARY_DARK = new Color(36, 91, 219);
 
     /**
-     * 辅助色浅色 - Sky-400
+     * 辅助色浅色
      */
-    public static final Color SECONDARY_LIGHT = new Color(56, 189, 248);
+    public static final Color SECONDARY_LIGHT = new Color(122, 172, 255);
 
     /**
-     * 辅助色超浅 - Sky-100
+     * 辅助色超浅
      */
-    public static final Color SECONDARY_LIGHTER = new Color(224, 242, 254);
+    public static final Color SECONDARY_LIGHTER = new Color(233, 242, 255);
+
 
     // ==================== 强调色系 ====================
 
@@ -219,34 +221,34 @@ public final class ModernColors {
      * 暗色主题：Slate-100 (浅色文字)
      */
     public static Color getTextPrimary() {
-        return isDarkTheme() ? new Color(241, 245, 249) : new Color(15, 23, 42);
+        return isDarkTheme() ? new Color(241, 245, 249) : new Color(29, 33, 41);
     }
 
     /**
      * 文字次要色 - 根据主题自适应
-     * 亮色主题：Slate-700
-     * 暗色主题：Slate-300
+     * 亮色主题：灰色文本
+     * 暗色主题：浅灰文本
      */
     public static Color getTextSecondary() {
-        return isDarkTheme() ? new Color(203, 213, 225) : new Color(51, 65, 85);
+        return isDarkTheme() ? new Color(203, 213, 225) : new Color(78, 89, 105);
     }
 
     /**
      * 文字提示色 - 根据主题自适应
-     * 亮色主题：Slate-500
+     * 亮色主题：浅灰提示
      * 暗色主题：Slate-400
      */
     public static Color getTextHint() {
-        return isDarkTheme() ? new Color(148, 163, 184) : new Color(100, 116, 139);
+        return isDarkTheme() ? new Color(148, 163, 184) : new Color(134, 144, 156);
     }
 
     /**
      * 文字禁用色 - 根据主题自适应
-     * 亮色主题：Slate-400
+     * 亮色主题：浅灰禁用
      * 暗色主题：Slate-600
      */
     public static Color getTextDisabled() {
-        return isDarkTheme() ? new Color(71, 85, 105) : new Color(148, 163, 184);
+        return isDarkTheme() ? new Color(71, 85, 105) : new Color(201, 205, 212);
     }
 
     /**
@@ -268,24 +270,24 @@ public final class ModernColors {
     /**
      * 背景浅灰 - Slate-50
      */
-    public static final Color BG_LIGHT = new Color(248, 250, 252);
+    public static final Color BG_LIGHT = new Color(245, 247, 250);
 
     /**
-     * 背景中灰 - Slate-100
+     * 背景中灰
      */
-    public static final Color BG_MEDIUM = new Color(241, 245, 249);
+    public static final Color BG_MEDIUM = new Color(242, 243, 245);
 
     /**
-     * 背景深灰 - Slate-200
+     * 背景深灰
      */
-    public static final Color BG_DARK = new Color(226, 232, 240);
+    public static final Color BG_DARK = new Color(229, 230, 235);
 
     // ==================== 边框色 ====================
 
     /**
-     * 边框浅色 - Slate-200
+     * 边框浅色
      */
-    public static final Color BORDER_LIGHT = new Color(226, 232, 240);
+    public static final Color BORDER_LIGHT = new Color(229, 230, 235);
 
     /**
      * 边框中色 - Slate-300
@@ -302,8 +304,7 @@ public final class ModernColors {
         if (isDarkTheme()) {
             return new Color(80, 83, 85);
         } else {
-            // 亮色主题：使用 LIGHT_GRAY
-            return Color.LIGHT_GRAY;
+            return new Color(229, 230, 235);
         }
     }
 
@@ -312,12 +313,12 @@ public final class ModernColors {
     /**
      * 悬停背景
      */
-    public static final Color HOVER_BG = new Color(241, 245, 249);
+    public static final Color HOVER_BG = new Color(242, 244, 247);
 
     /**
      * 选中背景
      */
-    public static final Color SELECTED_BG = new Color(224, 231, 255);
+    public static final Color SELECTED_BG = new Color(230, 240, 255);
 
     // ==================== EasyPostman 应用颜色（从 EasyPostManColors 迁移） ====================
 
@@ -345,12 +346,12 @@ public final class ModernColors {
     /**
      * 滚动条滑块颜色
      */
-    public static final Color SCROLLBAR_THUMB = new Color(220, 225, 230);
+    public static final Color SCROLLBAR_THUMB = new Color(199, 205, 217);
 
     /**
      * 滚动条滑块悬停颜色
      */
-    public static final Color SCROLLBAR_THUMB_HOVER = new Color(200, 210, 220);
+    public static final Color SCROLLBAR_THUMB_HOVER = new Color(179, 187, 201);
 
     /**
      * 滚动条轨道颜色

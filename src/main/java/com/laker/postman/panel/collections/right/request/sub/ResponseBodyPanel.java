@@ -109,13 +109,13 @@ public class ResponseBodyPanel extends JPanel {
         prevIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
         prevButton = new JButton(prevIcon);
         prevButton.setFocusable(false);
-        prevButton.setToolTipText("Previous");
+        prevButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_NAV_PREVIOUS));
 
         FlatSVGIcon nextIcon = new FlatSVGIcon("icons/arrow-down.svg", ICON_SIZE, ICON_SIZE);
         nextIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
         nextButton = new JButton(nextIcon);
         nextButton.setFocusable(false);
-        nextButton.setToolTipText("Next");
+        nextButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_NAV_NEXT));
 
         rightPanel.add(searchField);
         rightPanel.add(prevButton);
@@ -124,7 +124,7 @@ public class ResponseBodyPanel extends JPanel {
         FlatSVGIcon wrapIcon = new FlatSVGIcon("icons/wrap.svg", ICON_SIZE, ICON_SIZE);
         wrapIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
         wrapButton = new JToggleButton(wrapIcon);
-        wrapButton.setToolTipText("Toggle Line Wrap");
+        wrapButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_WRAP));
         wrapButton.setSelected(false); // 默认不启用换行
         wrapButton.setFocusable(false); // 不可聚焦
         rightPanel.add(wrapButton);
@@ -133,14 +133,14 @@ public class ResponseBodyPanel extends JPanel {
         formatIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
         formatButton = new JButton(formatIcon);
         formatButton.setFocusable(false);
-        formatButton.setToolTipText("Format");
+        formatButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_FORMAT));
         rightPanel.add(formatButton);
 
         FlatSVGIcon downloadIcon = new FlatSVGIcon("icons/download.svg", ICON_SIZE, ICON_SIZE);
         downloadIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
         downloadButton = new JButton(downloadIcon);
         downloadButton.setFocusable(false);
-        downloadButton.setToolTipText("Download");
+        downloadButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_DOWNLOAD));
         rightPanel.add(downloadButton);
 
         // 只有 HTTP 请求才显示保存响应按钮，且放在最后面
@@ -149,7 +149,7 @@ public class ResponseBodyPanel extends JPanel {
             saveIcon.setColorFilter(new FlatSVGIcon.ColorFilter(color -> UIManager.getColor(BUTTON_FOREGROUND_KEY)));
             saveResponseButton = new JButton(saveIcon);
             saveResponseButton.setFocusable(false);
-            saveResponseButton.setToolTipText("Save Response");
+            saveResponseButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_SAVE_RESPONSE));
             rightPanel.add(saveResponseButton);
         }
 
@@ -470,7 +470,9 @@ public class ResponseBodyPanel extends JPanel {
         String text = resp.body;
         String contentType = extractContentType(resp.headers);
 
-        int textSize = text != null ? text.getBytes().length : 0;
+        int textSize = resp.bodySize > 0
+                ? (int) Math.min(Integer.MAX_VALUE, resp.bodySize)
+                : (text != null ? text.length() : 0);
         boolean isLargeResponse = textSize > LARGE_RESPONSE_THRESHOLD;
 
         // 显示大小信息
@@ -512,6 +514,7 @@ public class ResponseBodyPanel extends JPanel {
                         responseBodyPane.setText(text);
                     } finally {
                         responseBodyPane.setCaretPosition(0);
+                        refreshResponseView();
                     }
                 }
             };
@@ -523,6 +526,7 @@ public class ResponseBodyPanel extends JPanel {
                 sizeWarningLabel.setText(sizeWarningLabel.getText() + SKIP_AUTO_FORMAT_MESSAGE);
             }
             responseBodyPane.setCaretPosition(0);
+            refreshResponseView();
         }
 
     }
@@ -657,6 +661,17 @@ public class ResponseBodyPanel extends JPanel {
      */
     private void updateEditorFont() {
         responseBodyPane.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
+    }
+
+    private void refreshResponseView() {
+        responseBodyPane.revalidate();
+        responseBodyPane.repaint();
+        if (scrollPane != null) {
+            scrollPane.revalidate();
+            scrollPane.repaint();
+        }
+        revalidate();
+        repaint();
     }
 
 }

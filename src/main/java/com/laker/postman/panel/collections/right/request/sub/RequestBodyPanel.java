@@ -120,9 +120,9 @@ public class RequestBodyPanel extends JPanel {
         // 搜索区控件
         searchField = new SearchTextField();
         JButton prevButton = new JButton(new FlatSVGIcon("icons/arrow-up.svg", 18, 18));
-        prevButton.setToolTipText("Previous");
+        prevButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_NAV_PREVIOUS));
         JButton nextButton = new JButton(new FlatSVGIcon("icons/arrow-down.svg", 18, 18));
-        nextButton.setToolTipText("Next");
+        nextButton.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_NAV_NEXT));
         topPanel.add(searchField);
         topPanel.add(prevButton);
         topPanel.add(nextButton);

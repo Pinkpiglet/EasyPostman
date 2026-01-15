@@ -4,7 +4,6 @@ import com.laker.postman.common.SingletonFactory;
 import com.laker.postman.common.exception.CancelException;
 import com.laker.postman.frame.MainFrame;
 import com.laker.postman.ioc.Component;
-import com.laker.postman.panel.functional.FunctionalPanel;
 import com.laker.postman.panel.performance.PerformancePanel;
 import com.laker.postman.service.collections.OpenedRequestsService;
 import lombok.extern.slf4j.Slf4j;
@@ -24,14 +23,6 @@ public class ExitService {
         } catch (CancelException e) {
             // 用户取消了保存操作，终止退出
             return;
-        }
-
-        // 保存功能测试配置
-        try {
-            FunctionalPanel functionalPanel = SingletonFactory.getInstance(FunctionalPanel.class);
-            functionalPanel.save();
-        } catch (Exception e) {
-            log.error("Failed to save functional test config on exit", e);
         }
 
         // 保存性能测试配置

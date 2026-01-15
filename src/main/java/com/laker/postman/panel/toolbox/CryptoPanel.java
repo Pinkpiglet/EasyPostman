@@ -119,19 +119,19 @@ public class CryptoPanel extends JPanel {
         optionsPanel.add(new JSeparator(SwingConstants.VERTICAL));
 
         JButton encryptBtn = new JButton(I18nUtil.getMessage(MessageKeys.TOOLBOX_CRYPTO_ENCRYPT));
-        encryptBtn.setToolTipText("Ctrl+E / Cmd+E");
+        encryptBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CRYPTO_ENCRYPT));
         encryptBtn.addActionListener(e -> encrypt());
 
         JButton decryptBtn = new JButton(I18nUtil.getMessage(MessageKeys.TOOLBOX_CRYPTO_DECRYPT));
-        decryptBtn.setToolTipText("Ctrl+D / Cmd+D");
+        decryptBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CRYPTO_DECRYPT));
         decryptBtn.addActionListener(e -> decrypt());
 
         JButton copyBtn = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_COPY));
-        copyBtn.setToolTipText("Ctrl+C / Cmd+C");
+        copyBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CRYPTO_COPY));
         copyBtn.addActionListener(e -> copyToClipboard());
 
         JButton clearBtn = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_CLEAR));
-        clearBtn.setToolTipText("Ctrl+L / Cmd+L");
+        clearBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_CRYPTO_CLEAR));
         clearBtn.addActionListener(e -> clearAll());
 
         optionsPanel.add(encryptBtn);

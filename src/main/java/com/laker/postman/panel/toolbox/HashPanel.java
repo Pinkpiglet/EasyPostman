@@ -105,7 +105,7 @@ public class HashPanel extends JPanel {
         });
 
         JButton calculateBtn = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_CALCULATE));
-        calculateBtn.setToolTipText("Ctrl+Enter / Cmd+Enter");
+        calculateBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_HASH_CALCULATE));
         calculateBtn.addActionListener(e -> {
             if (calculateAllCheckBox.isSelected()) {
                 calculateAllHashes();
@@ -115,11 +115,11 @@ public class HashPanel extends JPanel {
         });
 
         JButton copyBtn = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_COPY));
-        copyBtn.setToolTipText("Ctrl+C / Cmd+C");
+        copyBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_HASH_COPY));
         copyBtn.addActionListener(e -> copyToClipboard());
 
         JButton clearBtn = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_CLEAR));
-        clearBtn.setToolTipText("Ctrl+L / Cmd+L");
+        clearBtn.setToolTipText(I18nUtil.getMessage(MessageKeys.TOOLTIP_HASH_CLEAR));
         clearBtn.addActionListener(e -> clearAll());
 
         optionsPanel.add(calculateAllCheckBox);

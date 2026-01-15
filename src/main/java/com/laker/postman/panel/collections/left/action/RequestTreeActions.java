@@ -10,8 +10,7 @@ import com.laker.postman.panel.collections.left.RequestCollectionsLeftPanel;
 import com.laker.postman.panel.collections.left.dialog.AddRequestDialog;
 import com.laker.postman.panel.collections.right.RequestEditPanel;
 import com.laker.postman.panel.collections.right.request.RequestEditSubPanel;
-import com.laker.postman.panel.functional.FunctionalPanel;
-import com.laker.postman.panel.sidebar.SidebarTabPanel;
+
 import com.laker.postman.service.collections.RequestsPersistence;
 import com.laker.postman.service.curl.CurlParser;
 import com.laker.postman.service.http.PreparedRequestBuilder;
@@ -706,35 +705,8 @@ public class RequestTreeActions {
                 ((Object[]) collectionNode.getUserObject())[1], targetWorkspace.getName());
     }
 
-    /**
-     * 添加选中的请求到功能测试
-     */
-    public void addSelectedRequestsToFunctionalTest() {
-        TreePath[] selectedPaths = requestTree.getSelectionPaths();
-        if (selectedPaths == null || selectedPaths.length == 0) return;
-
-        List<HttpRequestItem> requestsToAdd = new ArrayList<>();
-        for (TreePath path : selectedPaths) {
-            DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-            collectRequestsRecursively(node, requestsToAdd);
-        }
-
-        if (requestsToAdd.isEmpty()) return;
-
-        try {
-            FunctionalPanel functionalPanel = SingletonFactory.getInstance(FunctionalPanel.class);
-            functionalPanel.loadRequests(requestsToAdd);
-
-            // 切换到功能测试Tab
-            SidebarTabPanel sidebarPanel = SingletonFactory.getInstance(SidebarTabPanel.class);
-            JTabbedPane tabbedPane = sidebarPanel.getTabbedPane();
-            tabbedPane.setSelectedIndex(3); // 功能测试Tab索引
-        } catch (Exception e) {
-            log.error("添加请求到功能测试失败", e);
-        }
-    }
-
     // ==================== 辅助方法 ====================
+
 
     private DefaultMutableTreeNode getSelectedNode() {
         return (DefaultMutableTreeNode) requestTree.getLastSelectedPathComponent();

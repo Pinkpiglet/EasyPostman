@@ -113,6 +113,45 @@ public class MainFrame extends JFrame {
         }
     }
 
+    /**
+     * 语言切换后全量刷新 UI
+     */
+    public void reloadForLanguageChange() {
+        setName(I18nUtil.getMessage(MessageKeys.APP_NAME));
+        setTitle(I18nUtil.getMessage(MessageKeys.APP_NAME));
+
+        // 清理左侧栏标题缓存，避免语言切换后仍显示旧文本
+        com.laker.postman.model.SidebarTab.resetAllTitles();
+
+        // 保留当前主窗口实例，清理旧的 UI 单例
+        SingletonFactory.registerInstance(MainFrame.class, this);
+        SingletonFactory.clearInstancesExcept(MainFrame.class);
+
+        setJMenuBar(SingletonFactory.getInstance(TopMenuBar.class));
+        setContentPane(SingletonFactory.getInstance(MainPanel.class));
+
+        SwingUtilities.updateComponentTreeUI(this);
+        revalidate();
+        repaint();
+        // 清理菜单选择与悬浮提示，避免语言切换后残留空白提示框
+        javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+        PopupFactory.setSharedInstance(new PopupFactory());
+        ToolTipManager.sharedInstance().setEnabled(false);
+        SwingUtilities.invokeLater(() -> {
+            for (Window window : Window.getWindows()) {
+                if (window.getType() == Window.Type.POPUP || window instanceof JWindow) {
+                    window.setVisible(false);
+                    window.dispose();
+                }
+            }
+            repaint();
+        });
+        // 延迟恢复 tooltip，避免残留空白提示框闪烁
+        Timer tooltipTimer = new Timer(500, e -> ToolTipManager.sharedInstance().setEnabled(true));
+        tooltipTimer.setRepeats(false);
+        tooltipTimer.start();
+    }
+
     private void initWindowSize() {
         // 如果已有保存的窗口状态，则恢复上次的窗口状态
         if (UserSettingsUtil.hasWindowState()) {

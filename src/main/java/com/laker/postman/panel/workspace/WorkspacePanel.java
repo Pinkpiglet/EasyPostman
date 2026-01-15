@@ -15,7 +15,6 @@ import com.laker.postman.util.*;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -37,6 +36,9 @@ public class WorkspacePanel extends SingletonBasePanel {
     private JList<Workspace> workspaceList;
     private DefaultListModel<Workspace> listModel;
     private JPanel infoPanel;
+    private JTabbedPane detailTabs;
+    private JPanel workspaceDetailContainer;
+    private EnvironmentPanel environmentPanel;
     private JTextArea logArea;
     private transient WorkspaceService workspaceService;
     private javax.swing.Timer refreshDebounceTimer;
@@ -47,58 +49,81 @@ public class WorkspacePanel extends SingletonBasePanel {
     protected void initUI() {
         workspaceService = WorkspaceService.getInstance();
         setLayout(new BorderLayout());
-        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, ModernColors.getDividerBorderColor()));
 
-        // 创建顶部工具栏
-        add(createToolbar(), BorderLayout.NORTH);
+        add(createHeaderPanel(), BorderLayout.NORTH);
 
-        // 创建主要内容区域 - 垂直分割面板
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        // 上半部分 - 水平分割面板
         JSplitPane topSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         topSplitPane.setLeftComponent(createWorkspaceListPanel());
         topSplitPane.setRightComponent(createInfoPanel());
-        topSplitPane.setDividerLocation(300);
+        topSplitPane.setDividerLocation(320);
         topSplitPane.setResizeWeight(0.4);
+        topSplitPane.setDividerSize(4);
 
-        // 下半部分 - 日志区域
-        JPanel logPanel = createLogPanel();
+        JPanel mainCard = createCardPanel(topSplitPane);
+        mainCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
-        mainSplitPane.setTopComponent(topSplitPane);
-        mainSplitPane.setBottomComponent(logPanel);
-        mainSplitPane.setDividerLocation(400);
-        mainSplitPane.setResizeWeight(0.7);
+        JPanel logCard = createCardPanel(createLogPanel());
+        logCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 220));
+        logCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ModernColors.getDividerBorderColor()),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
 
-        add(mainSplitPane, BorderLayout.CENTER);
+        content.add(mainCard);
+        content.add(Box.createVerticalStrut(12));
+        content.add(logCard);
 
-        // 刷新工作区列表
+        add(content, BorderLayout.CENTER);
+
         requestWorkspaceRefresh();
 
     }
 
     /**
-     * 创建工具栏
+     * 创建顶部标题栏
      */
-    private JPanel createToolbar() {
-        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        toolbar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+    private JPanel createHeaderPanel() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ModernColors.getDividerBorderColor()));
+        header.setBackground(UIManager.getColor("Panel.background"));
 
-        // 新建工作区按钮
+        JLabel title = new JLabel(I18nUtil.getMessage(MessageKeys.MENU_WORKSPACES));
+        title.setFont(FontsUtil.getDefaultFont(Font.BOLD));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        left.setOpaque(false);
+        left.add(title);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        actions.setOpaque(false);
         JButton newButton = new JButton(I18nUtil.getMessage(MessageKeys.WORKSPACE_NEW));
         newButton.setIcon(IconUtil.createThemed("icons/plus.svg", IconUtil.SIZE_MEDIUM, IconUtil.SIZE_MEDIUM));
         newButton.setFont(FontsUtil.getDefaultFont(Font.PLAIN));
-        newButton.setFocusable(false); // 去掉按钮聚焦虚线
+        newButton.setFocusable(false);
         newButton.addActionListener(e -> showCreateWorkspaceDialog());
-        toolbar.add(newButton);
+        actions.add(newButton);
 
-        // 刷新按钮
         JButton refreshButton = new RefreshButton();
         refreshButton.addActionListener(e -> requestWorkspaceRefresh());
+        actions.add(refreshButton);
 
-        toolbar.add(refreshButton);
+        header.add(left, BorderLayout.WEST);
+        header.add(actions, BorderLayout.EAST);
+        return header;
+    }
 
-        return toolbar;
+    private JPanel createCardPanel(JComponent content) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ModernColors.getDividerBorderColor()),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+        panel.add(content, BorderLayout.CENTER);
+        return panel;
     }
 
     /**
@@ -150,18 +175,18 @@ public class WorkspacePanel extends SingletonBasePanel {
      */
     private JPanel createInfoPanel() {
         infoPanel = new JPanel(new BorderLayout());
-        infoPanel.setBorder(BorderFactory.createTitledBorder(I18nUtil.getMessage(MessageKeys.WORKSPACE_INFO)));
-        infoPanel.setPreferredSize(new Dimension(400, 0));
+        infoPanel.setPreferredSize(new Dimension(420, 0));
 
-        JLabel welcomeLabel = new JLabel("<html><center>" +
-                I18nUtil.getMessage(MessageKeys.FUNCTIONAL_DETAIL_WELCOME_MESSAGE) +
-                "</center></html>");
-        welcomeLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        welcomeLabel.setFont(FontsUtil.getDefaultFont(Font.ITALIC));
-        welcomeLabel.setForeground(Color.GRAY);
+        detailTabs = new JTabbedPane();
+        workspaceDetailContainer = new JPanel(new BorderLayout());
+        workspaceDetailContainer.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        detailTabs.addTab(I18nUtil.getMessage(MessageKeys.WORKSPACE_INFO), workspaceDetailContainer);
 
-        infoPanel.add(welcomeLabel, BorderLayout.CENTER);
+        environmentPanel = SingletonFactory.getInstance(EnvironmentPanel.class);
+        environmentPanel.setBorder(BorderFactory.createEmptyBorder());
+        detailTabs.addTab(I18nUtil.getMessage(MessageKeys.MENU_ENVIRONMENTS), environmentPanel);
 
+        infoPanel.add(detailTabs, BorderLayout.CENTER);
         return infoPanel;
     }
 
@@ -170,9 +195,13 @@ public class WorkspacePanel extends SingletonBasePanel {
      */
     private JPanel createLogPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        TitledBorder border = BorderFactory.createTitledBorder(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
-        panel.setBorder(border);
         panel.setPreferredSize(new Dimension(0, 150));
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        JLabel title = new JLabel(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
+        title.setFont(FontsUtil.getDefaultFont(Font.BOLD));
+        header.add(title, BorderLayout.WEST);
 
         // 创建日志文本区域
         logArea = new JTextArea();
@@ -185,13 +214,15 @@ public class WorkspacePanel extends SingletonBasePanel {
 
         // 添加清空日志按钮
         JPanel logToolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 2));
+        logToolbar.setOpaque(false);
         JButton clearLogButton = new JButton(I18nUtil.getMessage(MessageKeys.BUTTON_CLEAR));
         clearLogButton.setIcon(IconUtil.createThemed("icons/clear.svg", IconUtil.SIZE_MEDIUM, IconUtil.SIZE_MEDIUM));
         clearLogButton.setFont(FontsUtil.getDefaultFontWithOffset(Font.PLAIN, -1));
         clearLogButton.addActionListener(e -> logArea.setText(""));
         logToolbar.add(clearLogButton);
-        panel.add(logToolbar, BorderLayout.SOUTH);
+        header.add(logToolbar, BorderLayout.EAST);
 
+        panel.add(header, BorderLayout.NORTH);
         return panel;
     }
 
@@ -209,6 +240,26 @@ public class WorkspacePanel extends SingletonBasePanel {
 
             // 更新顶部菜单栏的工作区下拉框（不需要重新加载整个菜单栏）
             SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceComboBox();
+        }
+    }
+
+    private void showEditWorkspaceDialog(Workspace workspace) {
+        WorkspaceEditDialog dialog = new WorkspaceEditDialog(
+                SwingUtilities.getWindowAncestor(this),
+                workspace
+        );
+        dialog.setVisible(true);
+
+        if (dialog.isConfirmed()) {
+            requestWorkspaceRefresh();
+            SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceComboBox();
+
+            Workspace current = workspaceService.getCurrentWorkspace();
+            if (current != null && current.getId().equals(workspace.getId())) {
+                SingletonFactory.getInstance(TopMenuBar.class).updateWorkspaceDisplay();
+                SingletonFactory.getInstance(EnvironmentPanel.class)
+                        .switchWorkspaceAndRefreshUI(SystemUtil.getEnvPathForWorkspace(workspace));
+            }
         }
     }
 
@@ -313,6 +364,11 @@ public class WorkspacePanel extends SingletonBasePanel {
     }
 
     private void addManagementMenuItems(JPopupMenu menu, Workspace workspace) {
+        JMenuItem editItem = new JMenuItem(I18nUtil.getMessage(MessageKeys.WORKSPACE_EDIT));
+        editItem.setIcon(IconUtil.createThemed("icons/edit.svg", IconUtil.SIZE_SMALL, IconUtil.SIZE_SMALL));
+        editItem.addActionListener(e -> showEditWorkspaceDialog(workspace));
+        menu.add(editItem);
+
         // 默认工作区不可重命名和删除
         if (!WorkspaceStorageUtil.isDefaultWorkspace(workspace)) {
             // 重命名
@@ -608,22 +664,22 @@ public class WorkspacePanel extends SingletonBasePanel {
      */
     private void updateInfoPanel() {
         Workspace selected = workspaceList.getSelectedValue();
-        infoPanel.removeAll();
+        workspaceDetailContainer.removeAll();
 
         if (selected != null) {
-            infoPanel.add(new WorkspaceDetailPanel(selected), BorderLayout.CENTER);
+            workspaceDetailContainer.add(new WorkspaceDetailPanel(selected), BorderLayout.CENTER);
         } else {
             JLabel welcomeLabel = new JLabel(HTML_START + "<center>" +
-                    I18nUtil.getMessage(MessageKeys.FUNCTIONAL_DETAIL_WELCOME_MESSAGE) +
+                    I18nUtil.getMessage(MessageKeys.WORKSPACE_PANEL_HINT) +
                     "</center>" + HTML_END);
             welcomeLabel.setHorizontalAlignment(SwingConstants.CENTER);
             welcomeLabel.setFont(FontsUtil.getDefaultFont(Font.ITALIC));
             welcomeLabel.setForeground(Color.GRAY);
-            infoPanel.add(welcomeLabel, BorderLayout.CENTER);
+            workspaceDetailContainer.add(welcomeLabel, BorderLayout.CENTER);
         }
 
-        infoPanel.revalidate();
-        infoPanel.repaint();
+        workspaceDetailContainer.revalidate();
+        workspaceDetailContainer.repaint();
     }
 
     /**

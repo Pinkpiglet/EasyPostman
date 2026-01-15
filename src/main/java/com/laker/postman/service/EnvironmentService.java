@@ -38,6 +38,8 @@ public class EnvironmentService {
 
     private static final Pattern VAR_PATTERN = Pattern.compile("\\{\\{(.+?)}}");
 
+    private static final String DEFAULT_ENV_NAME = "Default Env";
+
     // 临时变量，仅本次请求有效，优先级高于环境变量
     private static final ThreadLocal<Map<String, String>> temporaryVariables = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
@@ -140,22 +142,14 @@ public class EnvironmentService {
     private static void createDefaultEnvironments() {
         environments.clear();
 
-        // Create Development Environment
-        Environment devEnv = new Environment("Dev Env");
-        devEnv.setId("dev-" + System.currentTimeMillis());
-        devEnv.setActive(true);
-        devEnv.addVariable("baseUrl", "https://so.gitee.com");
-        devEnv.addVariable("apiKey", "dev-api-key-123");
+        // Create Default Environment (empty)
+        Environment defaultEnv = new Environment("Default Env");
+        defaultEnv.setId("env-" + System.currentTimeMillis());
+        defaultEnv.setActive(true);
+        defaultEnv.setBaseUrl("");
 
-        // Create Testing Environment
-        Environment testEnv = new Environment("Test Env");
-        testEnv.setId("test-" + System.currentTimeMillis());
-        testEnv.addVariable("baseUrl", "https://so.csdn.net/so/search");
-        testEnv.addVariable("apiKey", "test-api-key-456");
-
-        environments.put(devEnv.getId(), devEnv);
-        environments.put(testEnv.getId(), testEnv);
-        activeEnvironment = devEnv;
+        environments.put(defaultEnv.getId(), defaultEnv);
+        activeEnvironment = defaultEnv;
 
         saveEnvironments();
     }
@@ -186,6 +180,81 @@ public class EnvironmentService {
             log.debug("环境变量已保存到: {}", filePath);
         } catch (Exception e) {
             log.error("保存环境变量失败", e);
+        }
+    }
+
+    public static void updateWorkspaceBaseUrl(String filePath, String baseUrl) {
+        if (filePath == null || filePath.isBlank()) {
+            return;
+        }
+        List<Environment> envList = readEnvironmentsFromFile(filePath);
+        Environment target = envList.stream()
+                .filter(Environment::isActive)
+                .findFirst()
+                .orElse(envList.isEmpty() ? null : envList.get(0));
+
+        if (target == null) {
+            target = createDefaultEnvironment(baseUrl);
+            envList.add(target);
+        } else {
+            target.setActive(true);
+            target.setBaseUrl(baseUrl == null ? "" : baseUrl.trim());
+        }
+
+        writeEnvironmentsToFile(filePath, envList);
+    }
+
+    public static String getWorkspaceBaseUrl(String filePath) {
+        if (filePath == null || filePath.isBlank()) {
+            return "";
+        }
+        List<Environment> envList = readEnvironmentsFromFile(filePath);
+        if (envList.isEmpty()) {
+            return "";
+        }
+        Environment target = envList.stream()
+                .filter(Environment::isActive)
+                .findFirst()
+                .orElse(envList.get(0));
+        String baseUrl = target.getBaseUrl();
+        return baseUrl == null ? "" : baseUrl;
+    }
+
+    private static Environment createDefaultEnvironment(String baseUrl) {
+        Environment environment = new Environment(DEFAULT_ENV_NAME);
+        environment.setId("env-" + System.currentTimeMillis());
+        environment.setActive(true);
+        environment.setBaseUrl(baseUrl == null ? "" : baseUrl.trim());
+        return environment;
+    }
+
+    private static List<Environment> readEnvironmentsFromFile(String filePath) {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            return new ArrayList<>();
+        }
+        try {
+            JSONArray array = JSONUtil.readJSONArray(file, StandardCharsets.UTF_8);
+            List<Environment> envList = new ArrayList<>();
+            for (Object obj : array) {
+                Environment env = JSONUtil.toBean((JSONObject) obj, Environment.class);
+                envList.add(env);
+            }
+            return envList;
+        } catch (Exception e) {
+            log.error("加载环境变量失败: {}", filePath, e);
+            return new ArrayList<>();
+        }
+    }
+
+    private static void writeEnvironmentsToFile(String filePath, List<Environment> envList) {
+        try {
+            File file = new File(filePath);
+            FileUtil.mkParentDirs(file);
+            String jsonStr = JSONUtil.toJsonPrettyStr(envList);
+            FileUtil.writeString(jsonStr, file, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.error("保存环境变量失败: {}", filePath, e);
         }
     }
 

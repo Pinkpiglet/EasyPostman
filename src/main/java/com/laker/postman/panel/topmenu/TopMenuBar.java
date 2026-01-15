@@ -16,6 +16,7 @@ import com.laker.postman.model.Workspace;
 import com.laker.postman.model.WorkspaceType;
 import com.laker.postman.panel.collections.left.RequestCollectionsLeftPanel;
 import com.laker.postman.panel.env.EnvironmentPanel;
+import com.laker.postman.frame.MainFrame;
 
 import com.laker.postman.panel.topmenu.setting.ModernSettingsDialog;
 import com.laker.postman.panel.workspace.components.GitOperationDialog;
@@ -23,7 +24,8 @@ import com.laker.postman.service.ExitService;
 
 import com.laker.postman.service.WorkspaceService;
 import com.laker.postman.service.setting.ShortcutManager;
-import com.laker.postman.util.*;\nimport com.laker.postman.util.MenuFactory;
+import com.laker.postman.util.*;
+import com.laker.postman.util.MenuFactory;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,7 +56,7 @@ public class TopMenuBar extends SingletonBaseMenuBar {
     /**
      * 获取主题适配的边框颜色（用于HTML）
      */
-@SuppressWarnings("unused")
+    @SuppressWarnings("unused")
     private static String getThemeBorderColor() { // 已迁移到 ThemeColors
         return ThemeColors.getBorderColor();
     }
@@ -146,7 +148,7 @@ public class TopMenuBar extends SingletonBaseMenuBar {
         addRightLableAndComboBox();
     }
 
-private void addFileMenu() {
+    private void addFileMenu() {
         JMenu fileMenu = menuFactory.createMenu(I18nUtil.getMessage(MessageKeys.MENU_FILE));
         JMenuItem logMenuItem = menuFactory.createMenuItem(I18nUtil.getMessage(MessageKeys.MENU_FILE_LOG));
         logMenuItem.addActionListener(e -> openLogDirectory()); // 已通过工厂整合，行为保持不变
@@ -201,9 +203,20 @@ private void addFileMenu() {
 
     private void switchLanguage(String languageCode) {
         I18nUtil.setLocale(languageCode);
-        // 刷新 UI 文本以应用新语言
-        reloadMenuBar();
-        NotificationUtil.showWarning(I18nUtil.getMessage(MessageKeys.LANGUAGE_CHANGED));
+        SwingUtilities.invokeLater(() -> {
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window instanceof MainFrame mainFrame) {
+                mainFrame.reloadForLanguageChange();
+            } else if (window != null) {
+                SwingUtilities.updateComponentTreeUI(window);
+                window.invalidate();
+                window.validate();
+                window.repaint();
+            } else {
+                reloadMenuBar();
+            }
+            // 已移除语言切换提示弹窗
+        });
     }
 
     private void addThemeMenu() {
